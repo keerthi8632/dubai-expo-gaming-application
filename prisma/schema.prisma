@@ -1,0 +1,121 @@
+// Prisma schema for MH Markets Expo Game
+// Run `npx prisma migrate dev --name init` after setting DATABASE_URL in .env
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum GameType {
+  TRADE
+  SPIN
+}
+
+// Outcome forced by an admin, or left to the automatic engine
+enum ForcedOutcome {
+  WIN
+  LOSE
+}
+
+enum SessionStatus {
+  NOT_PLAYED
+  WON
+  LOST
+}
+
+enum Language {
+  ENGLISH
+  ARABIC
+}
+
+model Participant {
+  id              String   @id @default(cuid())
+  fullName        String
+  email           String
+  phone           String
+  countryCode     String   // dial code, e.g. "+971"
+  countryOfResidence String
+  doesTrade       Boolean?
+  language        Language @default(ENGLISH)
+
+  emailVerified   Boolean  @default(false)
+  phoneVerified   Boolean  @default(false)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  otpCodes        OtpCode[]
+  gameSessions    GameSession[]
+
+  // one participant should not be able to register twice with the same email
+  @@unique([email])
+  @@index([phone])
+}
+
+model OtpCode {
+  id              String   @id @default(cuid())
+  participantId   String
+  participant     Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  channel         String   // "email" or "sms"
+  code            String
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  attempts        Int      @default(0)
+
+  createdAt       DateTime @default(now())
+
+  @@index([participantId, channel])
+}
+
+model GameSession {
+  id              String        @id @default(cuid())
+  participantId   String
+  participant     Participant   @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  gameType        GameType
+  status          SessionStatus @default(NOT_PLAYED)
+
+  // Set by an admin ahead of time to guarantee the outcome.
+  // If null, the game engine decides (default win-rate applies).
+  forcedOutcome   ForcedOutcome?
+  forcedByAdminId String?
+  forcedAt        DateTime?
+
+  // Game-specific result snapshot, e.g. entry/exit price or wheel segment landed on
+  resultDetail    Json?
+
+  // Prize claim tracking (trade game "claim code" screen, spin wheel prize tiers)
+  prizeLabel      String?
+  claimCode       String?       @unique
+  claimedAt       DateTime?
+
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime      @default(now())
+
+  // enforces "one chance per game" at the database level
+  @@unique([participantId, gameType])
+  @@index([gameType, status])
+}
+
+model Admin {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  role          String   @default("admin") // "admin" | "superadmin"
+  createdAt     DateTime @default(now())
+}
+
+// Global settings an admin can tune without redeploying,
+// e.g. default win rate when no forced outcome is set, or active spin wheel segments
+model GameConfig {
+  id            String   @id @default(cuid())
+  key           String   @unique // "trade_default_win_rate" | "spin_segments" | ...
+  value         Json
+  updatedAt     DateTime @updatedAt
+}

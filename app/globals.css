@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* lightweight-charts injects its own attribution link into every chart it
+   renders — hiding it since we render our own "TradingView" branding footer. */
+#tv-attr-logo {
+  display: none !important;
+}
