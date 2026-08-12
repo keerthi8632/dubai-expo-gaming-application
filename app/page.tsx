@@ -13,10 +13,9 @@ export default function HomePage() {
   const [activeGame, setActiveGame] = useState<"TRADE" | "SPIN" | null>(null);
   const [hubspotOpen, setHubspotOpen] = useState(false);
 
-  // TEMPORARY BYPASS (Trade Prediction only): skip the register/OTP/terms modal
-  // and jump straight into the game with an auto-created guest participant, via
-  // the lightweight /api/guest route (no OTP row, no Resend email call). Spin
-  // Now goes through the real RegistrationFlow below.
+  // TEMPORARY BYPASS (both games): skip the register/OTP/terms modal and jump
+  // straight into the game with an auto-created guest participant, via the
+  // lightweight /api/guest route (no OTP row, no Resend email call).
   async function openGuestBypass(game: "TRADE" | "SPIN") {
     const res = await fetch("/api/guest", { method: "POST" });
     const data = await res.json();
@@ -31,8 +30,8 @@ export default function HomePage() {
       <div className="relative z-10 mx-auto flex h-full w-full max-w-[1080px] flex-col items-center px-[64px] py-8">
         <img src={LOGO} alt="MH Markets" className="h-8" />
 
-        <div className="mt-10 flex w-full max-w-[600px] flex-col gap-5">
-          <button onClick={() => openGuestBypass("TRADE")} className="w-full transition-transform active:scale-95">
+        <div className="mx-auto mt-10 flex w-full max-w-[600px] flex-col gap-5 lg:max-w-[360px] lg:gap-3">
+          <button onClick={() => setActiveGame("TRADE")} className="w-full transition-transform active:scale-95">
             <img src={TRADE_PREDICTION_BUTTON} alt="Trade Prediction" className="w-full" />
           </button>
           <button onClick={() => setActiveGame("SPIN")} className="w-full transition-transform active:scale-95">
@@ -44,9 +43,11 @@ export default function HomePage() {
         <div className="flex w-full flex-1 flex-col items-center justify-end gap-[72px] pb-[100px]">
           <button
             onClick={() => setHubspotOpen(true)}
-            className="flex w-full max-w-[780px] items-center justify-center gap-6 rounded-xl bg-brand-red px-[100px] py-8 transition-transform active:scale-[0.98]"
+            className="mx-auto flex w-full max-w-[780px] items-center justify-center gap-6 rounded-xl bg-brand-red px-[100px] py-8 transition-transform active:scale-[0.98] lg:max-w-[360px] lg:gap-3 lg:px-10 lg:py-4"
           >
-            <span className="text-center text-[56px] font-bold leading-normal tracking-normal text-[#FFFFFF]">Register</span>
+            <span className="text-center text-[56px] font-bold leading-normal tracking-normal text-[#FFFFFF] lg:text-2xl">
+              Register
+            </span>
           </button>
           <p className="w-full whitespace-nowrap text-center text-xs font-normal leading-[18px] tracking-normal text-white">
             Disclaimer: Charts are simulated (not live) and are for entertainment purposes only.

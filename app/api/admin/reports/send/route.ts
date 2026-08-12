@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/adminAuth";
 import { sendDailyReport } from "@/lib/adminReport";
+import { fromJson } from "@/lib/json";
 
 export async function POST(req: NextRequest) {
   if (!requireAdmin(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const config = await prisma.gameConfig.findUnique({ where: { key: "report_recipients" } });
-  const recipients = (config?.value as string[] | null) ?? [];
+  const recipients = fromJson<string[]>(config?.value, []);
   if (recipients.length === 0) {
     return NextResponse.json({ error: "No recipients configured" }, { status: 400 });
   }

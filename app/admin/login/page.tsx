@@ -42,7 +42,7 @@ export default function AdminLoginPage() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-lg border px-3 py-2 text-sm text-black"
           />
         </div>
         <div>
@@ -52,7 +52,7 @@ export default function AdminLoginPage() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-lg border px-3 py-2 text-sm text-black"
           />
         </div>
         {error && <p className="text-xs text-red-600">{error}</p>}

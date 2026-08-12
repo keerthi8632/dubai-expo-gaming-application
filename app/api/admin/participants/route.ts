@@ -8,12 +8,11 @@ export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim();
 
   const participants = await prisma.participant.findMany({
+    // SQLite's `contains` is already case-insensitive for ASCII by default,
+    // unlike Postgres — no `mode: "insensitive"` option needed/available here.
     where: q
       ? {
-          OR: [
-            { fullName: { contains: q, mode: "insensitive" } },
-            { email: { contains: q, mode: "insensitive" } },
-          ],
+          OR: [{ fullName: { contains: q } }, { email: { contains: q } }],
         }
       : undefined,
     include: { gameSessions: true },

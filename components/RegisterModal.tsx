@@ -40,7 +40,11 @@ export default function RegisterModal({ game, onSubmitted, onClose }: Props) {
   const [otp, setOtp] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  // Kept independent so sending the OTP doesn't also freeze the main submit
+  // button — the two were sharing one flag, which made both buttons show a
+  // "sending" state at once even though only one action was in flight.
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // Once set, the code field appears and this participant's OTP has been sent.
   const [participantId, setParticipantId] = useState<string | null>(null);
@@ -49,6 +53,10 @@ export default function RegisterModal({ game, onSubmitted, onClose }: Props) {
   const phoneCountry = COUNTRIES.find((c) => c.iso2 === phoneIso2) ?? DEFAULT_COUNTRY;
   const residenceCountry = COUNTRIES.find((c) => c.iso2 === residenceIso2);
   const otpSent = participantId !== null;
+
+  function clearFieldError(field: keyof FieldErrors) {
+    setFieldErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev));
+  }
 
   function validateAllFields(): FieldErrors {
     const errors: FieldErrors = {};
@@ -69,7 +77,7 @@ export default function RegisterModal({ game, onSubmitted, onClose }: Props) {
     }
     setFieldErrors((prev) => ({ ...prev, email: undefined }));
 
-    setLoading(true);
+    setSendingOtp(true);
     try {
       const res = await fetch("/api/register", {
         method: "POST",
@@ -88,7 +96,7 @@ export default function RegisterModal({ game, onSubmitted, onClose }: Props) {
     } catch (err: any) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      setSendingOtp(false);
     }
   }
 
@@ -115,17 +123,18 @@ export default function RegisterModal({ game, onSubmitted, onClose }: Props) {
   // email), then verifies the code the user already received.
   async function handleRegisterNow() {
     setError(null);
+
+    const errors = validateAllFields();
+    if (otpSent && otp.trim().length !== 6) errors.otp = "Enter the 6-digit code.";
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
     if (!otpSent) {
       setError("Send the verification code to your email first.");
       return;
     }
 
-    const errors = validateAllFields();
-    if (otp.trim().length !== 6) errors.otp = "Enter the 6-digit code.";
-    setFieldErrors(errors);
-    if (Object.keys(errors).length > 0) return;
-
-    setLoading(true);
+    setSubmitting(true);
     try {
       const updateRes = await fetch("/api/participant/update", {
         method: "PATCH",
@@ -151,7 +160,7 @@ export default function RegisterModal({ game, onSubmitted, onClose }: Props) {
     } catch (err: any) {
       setError(err.message);
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   }
 
@@ -181,7 +190,10 @@ export default function RegisterModal({ game, onSubmitted, onClose }: Props) {
             <Field label="First Name" required error={fieldErrors.firstName}>
               <input
                 value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
+                onChange={(e) => {
+                  setFirstName(e.target.value);
+                  clearFieldError("firstName");
+                }}
                 placeholder="First Name"
                 className={inputClass}
               />
@@ -201,7 +213,10 @@ export default function RegisterModal({ game, onSubmitted, onClose }: Props) {
                 <input
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    clearFieldError("email");
+                  }}
                   placeholder="Your Email Here"
                   disabled={otpSent}
                   className={`${inputClass} flex-1`}
@@ -209,10 +224,10 @@ export default function RegisterModal({ game, onSubmitted, onClose }: Props) {
                 <button
                   type="button"
                   onClick={sendOtp}
-                  disabled={loading || otpSent}
+                  disabled={sendingOtp || otpSent}
                   className="h-12 shrink-0 whitespace-nowrap rounded-lg bg-[#d81618] px-4 text-[14px] font-bold text-white disabled:opacity-60"
                 >
-                  {loading && !otpSent ? "Sending…" : otpSent ? "Code Sent" : "Send OTP"}
+                  {sendingOtp ? "Sending…" : otpSent ? "Code Sent" : "Send OTP"}
                 </button>
               </div>
             </Field>
@@ -222,7 +237,10 @@ export default function RegisterModal({ game, onSubmitted, onClose }: Props) {
                 <div className="flex items-center gap-4 self-stretch">
                   <input
                     value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    onChange={(e) => {
+                      setOtp(e.target.value.replace(/\D/g, "").slice(0, 6));
+                      clearFieldError("otp");
+                    }}
                     placeholder="6-digit code"
                     inputMode="numeric"
                     className={`${inputClass} flex-1 tracking-widest`}
@@ -249,7 +267,10 @@ export default function RegisterModal({ game, onSubmitted, onClose }: Props) {
                 />
                 <input
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    clearFieldError("phone");
+                  }}
                   placeholder="Your Phone Number Here"
                   className={`${inputClass} flex-1`}
                 />
@@ -259,26 +280,29 @@ export default function RegisterModal({ game, onSubmitted, onClose }: Props) {
             <Field label="Country" required error={fieldErrors.country}>
               <FlagSelect
                 value={residenceIso2}
-                onChange={setResidenceIso2}
+                onChange={(v) => {
+                  setResidenceIso2(v);
+                  clearFieldError("country");
+                }}
                 placeholder="Choose Your Country"
                 options={COUNTRIES.map((c) => ({ iso2: c.iso2, value: c.iso2, label: c.name }))}
               />
             </Field>
           </div>
-          <div className="h-4" />
+          {/* <div className="h-4" /> */}
 
           {error && <p className="px-8 text-xs text-red-600">{error}</p>}
 
           <div className="flex flex-col self-stretch bg-white px-8 pb-[26px] pt-[18px]">
             <button
               type="submit"
-              disabled={loading}
+              disabled={submitting}
               className="flex w-full items-center justify-center gap-3 rounded-[14px] bg-[#d81618] px-4 py-[18px] disabled:opacity-60"
             >
               <span className="text-center text-[16px] font-bold text-white">
-                {loading ? (otpSent ? "Verifying…" : "Sending code…") : otpSent ? "Verify & Continue" : "Register Now"}
+                {submitting ? (otpSent ? "Verifying…" : "Registering…") : otpSent ? "Verify & Continue" : "Register Now"}
               </span>
-              {!loading && <img src={ARROW_ICON} alt="" className="h-4 w-4" />}
+              {!submitting && <img src={ARROW_ICON} alt="" className="h-4 w-4" />}
             </button>
             <p className="flex h-[41px] flex-col items-center justify-center pb-3 pt-3.5 text-center text-[12px] leading-[18px] text-gray-500">
               By submitting, you agree we may contact you about our services.

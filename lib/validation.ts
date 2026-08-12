@@ -34,3 +34,13 @@ export const setOutcomeSchema = z.object({
   gameType: z.enum(["TRADE", "SPIN"]),
   forcedOutcome: z.enum(["WIN", "LOSE"]).nullable(),
 });
+
+export const spinSegmentsSchema = z
+  .array(
+    z.object({
+      label: z.string().min(1).max(80),
+      weight: z.number().positive(),
+      prize: z.string().min(1).max(80).nullable(),
+    })
+  )
+  .min(2, "Need at least 2 segments");

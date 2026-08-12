@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { toJson, fromJson } from "@/lib/json";
 import { z } from "zod";
 
 const schema = z.object({
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
   else if (existing?.forcedOutcome === "LOSE") won = false;
   else {
     const config = await prisma.gameConfig.findUnique({ where: { key: "trade_default_win_rate" } });
-    const rate = (config?.value as { rate?: number } | null)?.rate ?? DEFAULT_WIN_RATE;
+    const rate = fromJson<{ rate?: number }>(config?.value, {}).rate ?? DEFAULT_WIN_RATE;
     won = Math.random() < rate;
   }
 
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
       participantId,
       gameType: "TRADE",
       status: won ? "WON" : "LOST",
-      resultDetail: { entryPrice, exitPrice, prediction },
+      resultDetail: toJson({ entryPrice, exitPrice, prediction }),
       startedAt: now,
       completedAt: now,
       prizeLabel: won ? "USD 100 Funded Account" : null,
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest) {
     },
     update: {
       status: won ? "WON" : "LOST",
-      resultDetail: { entryPrice, exitPrice, prediction },
+      resultDetail: toJson({ entryPrice, exitPrice, prediction }),
       startedAt: now,
       completedAt: now,
       prizeLabel: won ? "USD 100 Funded Account" : null,

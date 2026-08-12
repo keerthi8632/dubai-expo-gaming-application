@@ -1,33 +1,34 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { motion, useAnimation } from "framer-motion";
+import { motion, useMotionValue, useTransform, useVelocity, animate } from "framer-motion";
 import TopBar from "@/components/TopBar";
 import PlayerBadge from "@/components/PlayerBadge";
 import ResultModal from "@/components/ResultModal";
 import AlreadyPlayedModal from "@/components/AlreadyPlayedModal";
 import Modal from "@/components/Modal";
 import VideoBackground from "@/components/VideoBackground";
-import { SPIN_SEGMENTS, SEGMENT_ANGLE, segmentCenterAngle } from "@/lib/spinSegments";
+import { DEFAULT_SPIN_SEGMENTS, SpinSegment, segmentAngle, segmentCenterAngle } from "@/lib/spinSegments";
 import { SPIN_WHEEL_BORDER, SPIN_NOW_BUTTON, WON_ICON, BETTER_LUCK_ICON } from "@/lib/media";
 
 const SPINS = 5;
 const WHEEL_SIZE = 953.297;
 const BORDER_ROTATION_DEG = 0; // tweak this to nudge the border ring's light pattern
 
-function wheelBackground() {
-  const stops = SPIN_SEGMENTS.map((_, i) => {
+function wheelBackground(segments: SpinSegment[]) {
+  const angle = segmentAngle(segments);
+  const stops = segments.map((_, i) => {
     const color = i % 2 === 0 ? "#ffffff" : "#B31217";
-    const from = i * SEGMENT_ANGLE;
-    const to = (i + 1) * SEGMENT_ANGLE;
+    const from = i * angle;
+    const to = (i + 1) * angle;
     return `${color} ${from}deg ${to}deg`;
   }).join(", ");
-  return `conic-gradient(from -${SEGMENT_ANGLE / 2}deg, ${stops})`;
+  return `conic-gradient(from -${angle / 2}deg, ${stops})`;
 }
 
-function labelPosition(index: number, radiusFraction: number) {
-  const angle = (segmentCenterAngle(index) * Math.PI) / 180;
+function labelPosition(segments: SpinSegment[], index: number, radiusFraction: number) {
+  const angle = (segmentCenterAngle(segments, index) * Math.PI) / 180;
   const x = radiusFraction * 50 * Math.sin(angle);
   const y = -radiusFraction * 50 * Math.cos(angle);
   return { x, y };
@@ -46,20 +47,29 @@ function SpinGameInner() {
   const participantId = searchParams.get("participantId");
   const name = searchParams.get("name") ?? "Player";
 
-  const controls = useAnimation();
+  // A live rotation value (not just an animation-complete callback) so each
+  // label can counter-rotate itself in real time as the disc spins — its
+  // position still orbits with the wheel, but the text glyphs stay upright.
+  const rotation = useMotionValue(0);
+  // Motion-blur: fast spin (high angular velocity) blurs the wheel, and it
+  // sharpens back up automatically as the wheel decelerates toward landing.
+  const rotationVelocity = useVelocity(rotation);
+  const blurPx = useTransform(rotationVelocity, [-2000, 0, 2000], [6, 0, 6], { clamp: true });
+  const discFilter = useTransform(blurPx, (b) => `blur(${b}px)`);
+  const [segments, setSegments] = useState<SpinSegment[]>(DEFAULT_SPIN_SEGMENTS);
   const [spinning, setSpinning] = useState(false);
-  // TESTING ONLY: force the win modal to always be visible so the design can be
-  // iterated on without spinning every time. Remove this hardcoded value (set
-  // back to `null`) before shipping.
-  // const [result, setResult] = useState<{ status: "WON" | "LOST"; segmentLabel: string; prizeLabel: string | null } | null>({
-  //   status: "WON",
-  //   segmentLabel: "USD 100 Funded Account*",
-  //   prizeLabel: "USD 100 Funded Trading Account",
-  // });
-  const [result, setResult] = useState<{ status: "WON" | "LOST";
- segmentLabel: string; prizeLabel: string | null } | null>(null);
+  const [result, setResult] = useState<{ status: "WON" | "LOST"; segmentLabel: string; prizeLabel: string | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [alreadyPlayed, setAlreadyPlayed] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/game/spin/segments")
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data.segments) && data.segments.length > 0) setSegments(data.segments);
+      })
+      .catch(() => {});
+  }, []);
 
   async function handleSpin() {
     if (!participantId || spinning) return;
@@ -79,14 +89,12 @@ function SpinGameInner() {
       }
       if (!res.ok) throw new Error(data.error ?? "Could not spin");
 
-      const center = segmentCenterAngle(data.segmentIndex);
-      const jitter = (Math.random() - 0.5) * (SEGMENT_ANGLE * 0.6);
+      const angle = segmentAngle(segments);
+      const center = segmentCenterAngle(segments, data.segmentIndex);
+      const jitter = (Math.random() - 0.5) * (angle * 0.6);
       const targetRotation = SPINS * 360 + (360 - center + jitter);
 
-      await controls.start({
-        rotate: targetRotation,
-        transition: { duration: 5, ease: [0.15, 0.85, 0.25, 1] },
-      });
+      await animate(rotation, targetRotation, { duration: 5, ease: [0.15, 0.85, 0.25, 1] });
 
       setResult(data);
     } catch (err: any) {
@@ -105,32 +113,26 @@ function SpinGameInner() {
         <PlayerBadge name={name} />
       </div>
 
-      <div className="flex w-full flex-1 flex-col items-center justify-center">
+      <div className="mt-6 flex w-full flex-1 flex-col items-center justify-start">
         <div
           className="relative aspect-square w-full max-w-[953.297px]"
           style={{ maxWidth: `min(${WHEEL_SIZE}px, 88vw, 50vh)` }}
         >
-          {/* disc + labels spin together; the outer border ring stays fixed */}
-          <motion.div animate={controls} className="absolute inset-[3%] z-10 rounded-full" style={{ background: wheelBackground() }}>
-            {SPIN_SEGMENTS.map((seg, i) => {
-              const { x, y } = labelPosition(i, 0.62);
-              const isWhite = i % 2 === 0;
-              return (
-                <div
-                  key={seg.label}
-                  className="absolute w-[30%] text-center font-bold leading-tight"
-                  style={{
-                    left: `${50 + x}%`,
-                    top: `${50 + y}%`,
-                    transform: "translate(-50%, -50%)",
-                    color: isWhite ? "#1a1a1a" : "#ffffff",
-                    fontSize: "clamp(9px, 2.9vw, 20px)",
-                  }}
-                >
-                  {seg.label}
-                </div>
-              );
-            })}
+          {/* disc rotates; labels are children so their position orbits with it too,
+              but each one applies its own counter-rotation to stay upright */}
+          <motion.div
+            className="absolute inset-[3%] z-10 rounded-full"
+            style={{ background: wheelBackground(segments), rotate: rotation, filter: discFilter }}
+          >
+            {segments.map((seg, i) => (
+              <SegmentLabel
+                key={seg.label}
+                label={seg.label}
+                rotation={rotation}
+                position={labelPosition(segments, i, 0.62)}
+                color={i % 2 === 0 ? "#1a1a1a" : "#ffffff"}
+              />
+            ))}
           </motion.div>
 
           <img
@@ -146,13 +148,13 @@ function SpinGameInner() {
           {error && <p className="text-center text-xs text-red-400">{error}</p>}
         </div>
 
-        <div className="mt-4">
+        <div className="mt-4 w-full max-w-[600px] lg:max-w-[360px]">
           <button
             onClick={handleSpin}
             disabled={spinning}
-            className="transition-transform active:scale-95 disabled:opacity-50 disabled:active:scale-100"
+            className="w-full transition-transform active:scale-95 disabled:opacity-50 disabled:active:scale-100"
           >
-            <img src={SPIN_NOW_BUTTON} alt="Spin Now" className="h-[106px] w-[368px]" />
+            <img src={SPIN_NOW_BUTTON} alt="Spin Now" className="w-full" />
           </button>
         </div>
       </div>
@@ -187,5 +189,36 @@ function SpinGameInner() {
         <AlreadyPlayedModal />
       </Modal>
     </main>
+  );
+}
+
+function SegmentLabel({
+  label,
+  rotation,
+  position,
+  color,
+}: {
+  label: string;
+  rotation: ReturnType<typeof useMotionValue<number>>;
+  position: { x: number; y: number };
+  color: string;
+}) {
+  // Cancels out the disc's current rotation so the text glyphs stay upright
+  // while their left/top position (inherited from the rotating parent) still
+  // orbits correctly with the wedge they belong to.
+  const counterTransform = useTransform(rotation, (r) => `translate(-50%, -50%) rotate(${-r}deg)`);
+  return (
+    <motion.div
+      className="absolute w-[30%] text-center font-bold leading-tight"
+      style={{
+        left: `${50 + position.x}%`,
+        top: `${50 + position.y}%`,
+        transform: counterTransform,
+        color,
+        fontSize: "clamp(9px, 2.9vw, 20px)",
+      }}
+    >
+      {label}
+    </motion.div>
   );
 }

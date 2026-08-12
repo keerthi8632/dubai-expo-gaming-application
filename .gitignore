@@ -13,6 +13,12 @@
 .env
 .env*.local
 
+# SQLite database (local data, don't commit real participant records)
+/prisma/dev.db
+/prisma/dev.db-journal
+/prisma/dev.db-wal
+/prisma/dev.db-shm
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

@@ -10,7 +10,7 @@ export default function TopBar() {
       <button onClick={() => router.push("/")} className="transition-transform active:scale-95">
         <img src={HOME_BUTTON} alt="Home" className="h-9" />
       </button>
-      <img src={LOGO} alt="MH Markets" className="h-6" />
+      <img src={LOGO} alt="MH Markets" className="h-10" />
       <button onClick={() => router.push("/")} className="transition-transform active:scale-95">
         <img src={QUIT_BUTTON} alt="Quit" className="h-9" />
       </button>

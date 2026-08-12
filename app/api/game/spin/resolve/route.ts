@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { toJson } from "@/lib/json";
 import { z } from "zod";
-import { SPIN_SEGMENTS, pickSegmentIndex } from "@/lib/spinSegments";
+import { pickSegmentIndex } from "@/lib/spinSegments";
+import { getSpinSegments } from "@/lib/spinConfig";
 
 const schema = z.object({ participantId: z.string().cuid() });
 
@@ -19,8 +21,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Already played" }, { status: 409 });
   }
 
-  const segmentIndex = pickSegmentIndex(existing?.forcedOutcome ?? null);
-  const segment = SPIN_SEGMENTS[segmentIndex];
+  const segments = await getSpinSegments();
+  const segmentIndex = pickSegmentIndex(segments, (existing?.forcedOutcome as "WIN" | "LOSE" | null) ?? null);
+  const segment = segments[segmentIndex];
   const won = segment.prize !== null;
   const claimCode = won ? crypto.randomUUID().slice(0, 8).toUpperCase() : null;
   const now = new Date();
@@ -31,7 +34,7 @@ export async function POST(req: NextRequest) {
       participantId,
       gameType: "SPIN",
       status: won ? "WON" : "LOST",
-      resultDetail: { segmentIndex, segmentLabel: segment.label },
+      resultDetail: toJson({ segmentIndex, segmentLabel: segment.label }),
       startedAt: now,
       completedAt: now,
       prizeLabel: segment.prize,
@@ -39,7 +42,7 @@ export async function POST(req: NextRequest) {
     },
     update: {
       status: won ? "WON" : "LOST",
-      resultDetail: { segmentIndex, segmentLabel: segment.label },
+      resultDetail: toJson({ segmentIndex, segmentLabel: segment.label }),
       startedAt: now,
       completedAt: now,
       prizeLabel: segment.prize,

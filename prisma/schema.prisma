@@ -1,36 +1,25 @@
 // Prisma schema for MH Markets Expo Game
 // Run `npx prisma migrate dev --name init` after setting DATABASE_URL in .env
+//
+// SQLite doesn't support native `enum` or `Json` column types, so fields that
+// would otherwise be enums are plain String columns (validated at the
+// application layer via lib/validation.ts and TypeScript unions instead of
+// the database), and Json fields are stored as serialized text — see
+// lib/json.ts for the read/write helpers.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
-enum GameType {
-  TRADE
-  SPIN
-}
-
-// Outcome forced by an admin, or left to the automatic engine
-enum ForcedOutcome {
-  WIN
-  LOSE
-}
-
-enum SessionStatus {
-  NOT_PLAYED
-  WON
-  LOST
-}
-
-enum Language {
-  ENGLISH
-  ARABIC
-}
+// GameType: "TRADE" | "SPIN"
+// ForcedOutcome: "WIN" | "LOSE" | null
+// SessionStatus: "NOT_PLAYED" | "WON" | "LOST"
+// Language: "ENGLISH" | "ARABIC"
 
 model Participant {
   id              String   @id @default(cuid())
@@ -40,7 +29,7 @@ model Participant {
   countryCode     String   // dial code, e.g. "+971"
   countryOfResidence String
   doesTrade       Boolean?
-  language        Language @default(ENGLISH)
+  language        String   @default("ENGLISH")
 
   emailVerified   Boolean  @default(false)
   phoneVerified   Boolean  @default(false)
@@ -77,17 +66,18 @@ model GameSession {
   participantId   String
   participant     Participant   @relation(fields: [participantId], references: [id], onDelete: Cascade)
 
-  gameType        GameType
-  status          SessionStatus @default(NOT_PLAYED)
+  gameType        String        // "TRADE" | "SPIN"
+  status          String        @default("NOT_PLAYED") // "NOT_PLAYED" | "WON" | "LOST"
 
   // Set by an admin ahead of time to guarantee the outcome.
   // If null, the game engine decides (default win-rate applies).
-  forcedOutcome   ForcedOutcome?
+  forcedOutcome   String?       // "WIN" | "LOSE" | null
   forcedByAdminId String?
   forcedAt        DateTime?
 
-  // Game-specific result snapshot, e.g. entry/exit price or wheel segment landed on
-  resultDetail    Json?
+  // Game-specific result snapshot (entry/exit price or wheel segment landed on),
+  // stored as a JSON string — see lib/json.ts for parse/stringify helpers.
+  resultDetail    String?
 
   // Prize claim tracking (trade game "claim code" screen, spin wheel prize tiers)
   prizeLabel      String?
@@ -115,7 +105,7 @@ model Admin {
 // e.g. default win rate when no forced outcome is set, or active spin wheel segments
 model GameConfig {
   id            String   @id @default(cuid())
-  key           String   @unique // "trade_default_win_rate" | "spin_segments" | ...
-  value         Json
+  key           String   @unique // "trade_default_win_rate" | "report_recipients" | ...
+  value         String   // JSON string — see lib/json.ts
   updatedAt     DateTime @updatedAt
 }
