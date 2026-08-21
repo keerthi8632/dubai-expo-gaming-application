@@ -43,9 +43,33 @@ Visit `http://localhost:3000` (the app will use the next free port if 3000 is ta
 ### Admin dashboard (`app/admin/*`)
 JWT-cookie authenticated (seeded via `npm run db:seed`, no self-signup).
 - **Participants** — search/list registrants, drill into a participant to force a WIN/LOSE outcome for either game ahead of time.
-- **Game Config** — tune the Trade game's default win rate live (Spin segments are a code constant since they're fixed for the expo).
+- **Game Config** — tune the Trade game's default win rate and the Spin & Win wheel segments live. See [Game Config panel](#game-config-panel) below.
 - **Winners** — every WON session with its prize/claim code, mark prizes as claimed.
 - **Reports** — manage recipient emails and send a daily CSV summary (registrations + outcomes) on demand.
+
+### Game Config panel
+
+`/admin/config` — no code changes needed, takes effect on the next play.
+
+**Trade Prediction — Default Win Rate**
+A single slider (0–100%): the base chance a participant wins Trade Prediction when no per-participant override is set. E.g. 25% means roughly 1 in 4 players win, regardless of whether they picked Buy or Sell — the chart's price movement is purely cosmetic, it always animates to match whoever already won or lost. Has no effect on a participant who's been given a manual Force Win/Lose — that always takes priority. Click **Save** to apply.
+
+**Spin & Win — Segments**
+The wheel's layout, one row per wedge:
+
+| Column | What it controls |
+|---|---|
+| Label | Text shown on that wedge |
+| Prize | What the player wins if they land there. Leave empty = a losing wedge. |
+| Spin Again | Check for a wedge that gives another spin instead of a win/loss — no prize, session stays open. Checking it clears Prize automatically. |
+| Weight | How likely that wedge is relative to the others (bigger = more likely). Weights don't need to add up to 100, they're just a ratio. |
+
+Overall win odds = (sum of prize-wedge weights) ÷ (sum of all weights). **+ Add Segment** / **Remove** edit wedges (minimum 2); keep the total segment count **even** so the red/white alternating colors don't clash (the page warns if odd). Click **Save Segments** to publish.
+
+**Per-participant override (Force Win/Lose)**
+Set from a participant's own admin page — forces that one person's next attempt to win or lose regardless of the sliders/weights above. Always takes priority over everything on the Game Config page.
+
+**One rule everywhere**: each participant gets exactly one attempt per game (Trade Prediction and Spin & Win tracked separately); replaying shows "already played" and can only be reset via that participant's admin record.
 
 ### Data model (`prisma/schema.prisma`)
 `Participant`, `OtpCode`, `GameSession` (per-game result + optional admin `forcedOutcome`), `Admin`, `GameConfig`.
