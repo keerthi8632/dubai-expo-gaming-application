@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { COUNTRIES, DEFAULT_COUNTRY } from "@/lib/countries";
 import { PREDICTION_FORM_BANNER, SPIN_FORM_BANNER, ARROW_ICON } from "@/lib/media";
+import { PHONE_RE } from "@/lib/validation";
 import CloseButton from "./CloseButton";
 import FlagSelect from "./FlagSelect";
 
@@ -62,7 +63,7 @@ export default function RegisterModal({ game, onSubmitted, onClose }: Props) {
     const errors: FieldErrors = {};
     if (firstName.trim().length < 2) errors.firstName = "Enter your first name.";
     if (!EMAIL_RE.test(email.trim())) errors.email = "Enter a valid email address.";
-    if (phone.trim().length < 5) errors.phone = "Enter a valid phone number.";
+    if (!PHONE_RE.test(phone.trim())) errors.phone = "Enter a valid phone number.";
     if (!residenceIso2) errors.country = "Select your country.";
     return errors;
   }
@@ -85,7 +86,7 @@ export default function RegisterModal({ game, onSubmitted, onClose }: Props) {
         body: JSON.stringify({
           fullName: firstName.trim() || "Guest",
           email,
-          phone: phone.trim() || "0000000000",
+          phone: phone.trim() || "1000000000",
           countryCode: phoneCountry.dialCode,
           countryOfResidence: residenceCountry?.name ?? "Pending",
         }),
@@ -165,10 +166,10 @@ export default function RegisterModal({ game, onSubmitted, onClose }: Props) {
   }
 
   return (
-    <div className="relative w-[620px] max-w-full">
-      <div className="flex flex-col items-center gap-6 overflow-hidden rounded-[28px] bg-white">
+    <div className="relative max-h-[90vh] w-[620px] max-w-full overflow-y-auto">
+      <div className="flex flex-col items-center gap-3 overflow-hidden rounded-[28px] bg-white sm:gap-6">
         <div className="relative w-full">
-          <img src={copy.banner} alt="" className="h-[296px] w-full object-cover" />
+          <img src={copy.banner} alt="" className="h-[140px] w-full object-cover sm:h-[296px]" />
           <CloseButton onClose={onClose} className="right-4 top-4" />
         </div>
 
@@ -177,16 +178,18 @@ export default function RegisterModal({ game, onSubmitted, onClose }: Props) {
             e.preventDefault();
             handleRegisterNow();
           }}
-          className="flex w-full flex-col gap-12 bg-white"
+          className="flex w-full flex-col gap-5 bg-white sm:gap-12"
         >
-          <div className="flex flex-col items-center justify-center self-stretch pt-6">
-            <span className="text-center text-[30px] font-bold text-[#d81618]">{copy.title}</span>
-            <div className="flex h-[30px] w-full max-w-[392px] flex-col items-center pt-2">
-              <span className="text-center text-[14px] font-normal leading-[21.75px] text-[#70757e]">{copy.subtitle}</span>
+          <div className="flex flex-col items-center justify-center self-stretch pt-3 sm:pt-6">
+            <span className="text-center text-[22px] font-bold text-[#d81618] sm:text-[30px]">{copy.title}</span>
+            <div className="flex w-full max-w-[392px] flex-col items-center pt-1 sm:h-[30px] sm:pt-2">
+              <span className="text-center text-[13px] font-normal leading-snug text-[#70757e] sm:text-[14px] sm:leading-[21.75px]">
+                {copy.subtitle}
+              </span>
             </div>
           </div>
 
-          <div className="flex flex-col gap-4 self-stretch px-8">
+          <div className="flex flex-col gap-3 self-stretch px-5 sm:gap-4 sm:px-8">
             <Field label="First Name" required error={fieldErrors.firstName}>
               <input
                 value={firstName}
@@ -204,7 +207,7 @@ export default function RegisterModal({ game, onSubmitted, onClose }: Props) {
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 placeholder="Last Name"
-                className={inputClass}
+                className={inputClassOptional}
               />
             </Field>
 
@@ -268,10 +271,12 @@ export default function RegisterModal({ game, onSubmitted, onClose }: Props) {
                 <input
                   value={phone}
                   onChange={(e) => {
-                    setPhone(e.target.value);
+                    setPhone(e.target.value.replace(/\D/g, "").slice(0, 15));
                     clearFieldError("phone");
                   }}
                   placeholder="Your Phone Number Here"
+                  inputMode="numeric"
+                  autoComplete="tel-national"
                   className={`${inputClass} flex-1`}
                 />
               </div>
@@ -291,20 +296,20 @@ export default function RegisterModal({ game, onSubmitted, onClose }: Props) {
           </div>
           {/* <div className="h-4" /> */}
 
-          {error && <p className="px-8 text-xs text-red-600">{error}</p>}
+          {error && <p className="px-5 text-xs text-red-600 sm:px-8">{error}</p>}
 
-          <div className="flex flex-col self-stretch bg-white px-8 pb-[26px] pt-[18px]">
+          <div className="flex flex-col self-stretch bg-white px-5 pb-4 pt-3 sm:px-8 sm:pb-[26px] sm:pt-[18px]">
             <button
               type="submit"
               disabled={submitting}
-              className="flex w-full items-center justify-center gap-3 rounded-[14px] bg-[#d81618] px-4 py-[18px] disabled:opacity-60"
+              className="flex w-full items-center justify-center gap-3 rounded-[14px] bg-[#d81618] px-4 py-3 disabled:opacity-60 sm:py-[18px]"
             >
               <span className="text-center text-[16px] font-bold text-white">
                 {submitting ? (otpSent ? "Verifying…" : "Registering…") : otpSent ? "Verify & Continue" : "Register Now"}
               </span>
               {!submitting && <img src={ARROW_ICON} alt="" className="h-4 w-4" />}
             </button>
-            <p className="flex h-[41px] flex-col items-center justify-center pb-3 pt-3.5 text-center text-[12px] leading-[18px] text-gray-500">
+            <p className="flex flex-col items-center justify-center pb-1 pt-2 text-center text-[12px] leading-[18px] text-gray-500 sm:h-[41px] sm:pb-3 sm:pt-3.5">
               By submitting, you agree we may contact you about our services.
             </p>
           </div>
@@ -326,16 +331,21 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-2">
-      <span className="text-base font-normal leading-6 text-black">
+    <label className="flex flex-col gap-1 sm:gap-2">
+      <span className="text-[13px] font-normal leading-tight text-black sm:text-base sm:leading-6">
         {label}
         {required && <span className="text-[#d81618]">*</span>}
       </span>
       {children}
-      {error && <span className="text-xs text-[#d81618]">{error}</span>}
+      {error && <span className="text-[11px] text-[#d81618] sm:text-xs">{error}</span>}
     </label>
   );
 }
 
 const inputClass =
-  "h-12 w-full rounded-lg border border-black/20 px-4 text-[14px] font-normal leading-[21px] text-black placeholder:text-black/50 disabled:bg-black/5 disabled:text-black/40";
+  "h-12 w-full rounded-lg border border-black/20 px-4 text-[14px] font-normal leading-[21px] text-black placeholder:text-black/50 hover:border-black focus:border-black focus:outline-none disabled:bg-black/5 disabled:text-black/40";
+
+// Optional fields (e.g. Last Name) skip the black hover/focus outline that
+// signals a required field.
+const inputClassOptional =
+  "h-12 w-full rounded-lg border border-black/20 px-4 text-[14px] font-normal leading-[21px] text-black placeholder:text-black/50 focus:outline-none disabled:bg-black/5 disabled:text-black/40";

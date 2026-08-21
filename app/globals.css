@@ -7,3 +7,21 @@
 #tv-attr-logo {
   display: none !important;
 }
+
+/* Kiosk hardening: booth tablets shouldn't allow pinch-zoom, text
+   selection, or the overscroll "bounce"/pull-to-refresh gesture that can
+   expose the browser UI. Inputs stay selectable so participants can still
+   edit their entries. */
+html,
+body {
+  overscroll-behavior: none;
+  touch-action: pan-x pan-y;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}

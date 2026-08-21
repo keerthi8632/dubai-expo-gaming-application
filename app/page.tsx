@@ -40,18 +40,24 @@ export default function HomePage() {
         </div>
 
         {/* Decorative hero visual (podium/phone/coins from Figma) — no asset provided yet, export from Figma and drop in public/media to fill this slot */}
-        <div className="flex w-full flex-1 flex-col items-center justify-end gap-[72px] pb-[100px]">
-          <button
-            onClick={() => setHubspotOpen(true)}
-            className="mx-auto flex w-full max-w-[780px] items-center justify-center gap-6 rounded-xl bg-brand-red px-[100px] py-8 transition-transform active:scale-[0.98] lg:max-w-[360px] lg:gap-3 lg:px-10 lg:py-4"
-          >
-            <span className="text-center text-[56px] font-bold leading-normal tracking-normal text-[#FFFFFF] lg:text-2xl">
-              Register
-            </span>
-          </button>
-          <p className="w-full whitespace-nowrap text-center text-xs font-normal leading-[18px] tracking-normal text-white">
-            Disclaimer: Charts are simulated (not live) and are for entertainment purposes only.
-          </p>
+        {/* Above the kiosk breakpoint (>1080px) this just fills remaining
+            height and sits at the bottom via justify-end, as before. At or
+            below 1080px it's pulled out of flow and fixed to the literal
+            bottom of the screen so it can't drift with content height above. */}
+        <div className="w-full flex-1 desktop:flex desktop:flex-col desktop:items-center desktop:justify-end desktop:gap-[72px] desktop:pb-[30px]">
+          <div className="fixed inset-x-0 bottom-0 z-10 flex flex-col items-center gap-[72px] px-[64px] pb-8 desktop:static desktop:z-auto desktop:contents desktop:px-0 desktop:pb-0">
+            <button
+              onClick={() => setHubspotOpen(true)}
+              className="mx-auto flex w-full max-w-[420px] items-center justify-center gap-3 rounded-xl bg-brand-red px-12 py-4 transition-transform active:scale-[0.98] desktop:max-w-[360px] desktop:gap-3 desktop:px-10 desktop:py-4"
+            >
+              <span className="text-center text-[28px] font-bold leading-normal tracking-normal text-[#FFFFFF] desktop:text-2xl">
+                Register
+              </span>
+            </button>
+            <p className="w-full whitespace-nowrap text-center text-xs font-normal leading-[18px] tracking-normal text-white">
+              Disclaimer: Charts are simulated (not live) and are for entertainment purposes only.
+            </p>
+          </div>
         </div>
       </div>
 

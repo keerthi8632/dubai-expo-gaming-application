@@ -1,9 +1,14 @@
 import { z } from "zod";
 
+// National number only (country code is captured separately) — digits only,
+// no leading zero, 7-15 digits per the ITU E.164 national-number length range.
+export const PHONE_RE = /^[1-9][0-9]{6,14}$/;
+const phoneField = z.string().regex(PHONE_RE, "Enter a valid phone number.");
+
 export const registerSchema = z.object({
   fullName: z.string().min(2).max(100),
   email: z.string().email(),
-  phone: z.string().min(5).max(20),
+  phone: phoneField,
   countryCode: z.string().min(1).max(5),
   countryOfResidence: z.string().min(2).max(60),
   doesTrade: z.boolean().optional(),
@@ -13,7 +18,7 @@ export const registerSchema = z.object({
 export const updateParticipantSchema = z.object({
   participantId: z.string().cuid(),
   fullName: z.string().min(2).max(100),
-  phone: z.string().min(5).max(20),
+  phone: phoneField,
   countryCode: z.string().min(1).max(5),
   countryOfResidence: z.string().min(2).max(60),
 });
