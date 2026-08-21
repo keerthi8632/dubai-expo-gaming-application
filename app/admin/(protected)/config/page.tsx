@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-type SpinSegment = { label: string; weight: number; prize: string | null };
+type SpinSegment = { label: string; weight: number; prize: string | null; isSpinAgain?: boolean };
 
 export default function ConfigPage() {
   const [rate, setRate] = useState(40);
@@ -104,8 +104,10 @@ export default function ConfigPage() {
       <div className="rounded-xl bg-white p-5 shadow">
         <h2 className="font-semibold">Spin & Win — Segments</h2>
         <p className="mt-1 text-xs text-black/50">
-          Add, remove, or edit wheel segments. Leave <strong>Prize</strong> empty to make it a losing segment. Weight
-          controls how likely a segment is relative to the others (higher = more likely) when the outcome isn't forced.
+          Add, remove, or edit wheel segments. Leave <strong>Prize</strong> empty to make it a losing segment, or check{" "}
+          <strong>Spin Again</strong> to give the participant another spin instead (no prize, no win or loss recorded).
+          Weight controls how likely a segment is relative to the others (higher = more likely) when the outcome isn't
+          forced.
         </p>
 
         <div className="mt-4 overflow-x-auto">
@@ -114,6 +116,7 @@ export default function ConfigPage() {
               <tr>
                 <th className="py-2 pr-3">Label</th>
                 <th className="py-2 pr-3">Prize (empty = lose)</th>
+                <th className="py-2 pr-3">Spin Again</th>
                 <th className="py-2 pr-3">Weight</th>
                 <th className="py-2" />
               </tr>
@@ -132,8 +135,21 @@ export default function ConfigPage() {
                     <input
                       value={seg.prize ?? ""}
                       onChange={(e) => updateSegment(i, { prize: e.target.value.trim() === "" ? null : e.target.value })}
-                      placeholder="e.g. USD 100 Funded Account"
-                      className="w-full rounded border px-2 py-1"
+                      placeholder={seg.isSpinAgain ? "N/A" : "e.g. USD 100 Funded Account"}
+                      disabled={seg.isSpinAgain}
+                      className="w-full rounded border px-2 py-1 disabled:bg-black/5 disabled:text-black/30"
+                    />
+                  </td>
+                  <td className="py-2 pr-3 text-center">
+                    <input
+                      type="checkbox"
+                      checked={seg.isSpinAgain ?? false}
+                      onChange={(e) =>
+                        updateSegment(i, {
+                          isSpinAgain: e.target.checked,
+                          prize: e.target.checked ? null : seg.prize,
+                        })
+                      }
                     />
                   </td>
                   <td className="py-2 pr-3">

@@ -89,6 +89,7 @@ export default function RegisterModal({ game, onSubmitted, onClose }: Props) {
           phone: phone.trim() || "1000000000",
           countryCode: phoneCountry.dialCode,
           countryOfResidence: residenceCountry?.name ?? "Pending",
+          game,
         }),
       });
       const data = await res.json();
@@ -166,7 +167,7 @@ export default function RegisterModal({ game, onSubmitted, onClose }: Props) {
   }
 
   return (
-    <div className="relative max-h-[90vh] w-[620px] max-w-full overflow-y-auto">
+    <div className="no-scrollbar relative max-h-[90vh] w-[620px] max-w-full overflow-y-auto">
       <div className="flex flex-col items-center gap-3 overflow-hidden rounded-[28px] bg-white sm:gap-6">
         <div className="relative w-full">
           <img src={copy.banner} alt="" className="h-[140px] w-full object-cover sm:h-[296px]" />

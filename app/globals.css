@@ -25,3 +25,14 @@ textarea {
   -webkit-user-select: text;
   user-select: text;
 }
+
+/* Scrollable form/modal containers keep working, just without a visible
+   scrollbar track cluttering the kiosk UI. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

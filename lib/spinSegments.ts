@@ -5,6 +5,9 @@ export type SpinSegment = {
   label: string;
   weight: number;
   prize: string | null; // null = a losing segment; non-null = the prize awarded
+  // true = landing here is neither a win nor a loss — the participant gets
+  // another spin instead. Always paired with prize: null.
+  isSpinAgain?: boolean;
 };
 
 export const DEFAULT_SPIN_SEGMENTS: SpinSegment[] = [
@@ -13,7 +16,7 @@ export const DEFAULT_SPIN_SEGMENTS: SpinSegment[] = [
   { label: "USD 100 Funded Account*", weight: 9, prize: "USD 100 Funded Account" },
   { label: "Grand Prize - USD 1,000 Funded Account*", weight: 1, prize: "USD 1,000 Funded Account" },
   { label: "Exclusive Access to Our Trading Academy", weight: 15, prize: "Trading Academy Access" },
-  { label: "Spin Again", weight: 15, prize: null },
+  { label: "Spin Again", weight: 15, prize: null, isSpinAgain: true },
 ];
 
 export function segmentAngle(segments: SpinSegment[]): number {
@@ -38,7 +41,9 @@ function pickWeightedIndex(segments: SpinSegment[], indices: number[]): number {
 
 export function pickSegmentIndex(segments: SpinSegment[], forcedOutcome: "WIN" | "LOSE" | null): number {
   const allIndices = segments.map((_, i) => i);
-  const loseIndices = allIndices.filter((i) => segments[i].prize === null);
+  // Forced outcomes must be definitive, so Spin Again segments are excluded
+  // from both pools — a forced WIN/LOSE should never resolve to "try again".
+  const loseIndices = allIndices.filter((i) => segments[i].prize === null && !segments[i].isSpinAgain);
   const winIndices = allIndices.filter((i) => segments[i].prize !== null);
 
   if (forcedOutcome === "LOSE" && loseIndices.length > 0) {

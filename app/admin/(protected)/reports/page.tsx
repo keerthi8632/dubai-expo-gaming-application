@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AdminSelect from "@/components/AdminSelect";
+
+type GameFilter = "" | "TRADE" | "SPIN";
 
 export default function ReportsPage() {
   const [recipients, setRecipients] = useState("");
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [gameFilter, setGameFilter] = useState<GameFilter>("");
 
   useEffect(() => {
     load();
@@ -37,10 +41,19 @@ export default function ReportsPage() {
   async function sendNow() {
     setSending(true);
     setMessage(null);
-    const res = await fetch("/api/admin/reports/send", { method: "POST" });
+    const res = await fetch("/api/admin/reports/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ gameType: gameFilter || undefined }),
+    });
     const data = await res.json();
     setSending(false);
     setMessage(res.ok ? `Report sent to ${data.recipients.join(", ")}.` : data.error ?? "Could not send report.");
+  }
+
+  function downloadReport() {
+    const params = gameFilter ? `?gameType=${gameFilter}` : "";
+    window.open(`/api/admin/reports/download${params}`, "_blank");
   }
 
   return (
@@ -63,12 +76,34 @@ export default function ReportsPage() {
       </div>
 
       <div className="rounded-xl bg-white p-5 shadow">
+        <h2 className="font-semibold">Game Filter</h2>
+        <p className="mt-1 text-xs text-black/50">Applies to both sending and downloading reports below.</p>
+        <AdminSelect
+          value={gameFilter}
+          onChange={(e) => setGameFilter(e.target.value as GameFilter)}
+          wrapperClassName="mt-3 w-full"
+        >
+          <option value="">All Games</option>
+          <option value="TRADE">Trade Prediction</option>
+          <option value="SPIN">Spin & Win</option>
+        </AdminSelect>
+      </div>
+
+      <div className="rounded-xl bg-white p-5 shadow">
         <h2 className="font-semibold">Send Daily Report</h2>
         <p className="mt-1 text-xs text-black/50">
           Emails today's registrations and game outcomes (as a CSV attachment) to the recipients above.
         </p>
         <button onClick={sendNow} disabled={sending} className="mt-3 rounded-lg bg-brand-red px-4 py-2 text-sm font-semibold text-white">
           {sending ? "Sending…" : "Send Report Now"}
+        </button>
+      </div>
+
+      <div className="rounded-xl bg-white p-5 shadow">
+        <h2 className="font-semibold">Download Report</h2>
+        <p className="mt-1 text-xs text-black/50">Downloads a CSV of all registrations and game outcomes to date.</p>
+        <button onClick={downloadReport} className="mt-3 rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white">
+          Download CSV
         </button>
       </div>
 

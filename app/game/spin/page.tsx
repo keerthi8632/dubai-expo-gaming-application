@@ -1,18 +1,28 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { motion, useMotionValue, useTransform, useVelocity, animate } from "framer-motion";
+import { motion, useMotionValue, useTransform, useVelocity, animate, AnimationPlaybackControls } from "framer-motion";
 import TopBar from "@/components/TopBar";
 import PlayerBadge from "@/components/PlayerBadge";
 import ResultModal from "@/components/ResultModal";
+import SpinAgainModal from "@/components/SpinAgainModal";
 import AlreadyPlayedModal from "@/components/AlreadyPlayedModal";
+import CountdownModal from "@/components/CountdownModal";
 import Modal from "@/components/Modal";
 import VideoBackground from "@/components/VideoBackground";
 import { DEFAULT_SPIN_SEGMENTS, SpinSegment, segmentAngle, segmentCenterAngle } from "@/lib/spinSegments";
-import { SPIN_WHEEL_BORDER, SPIN_NOW_BUTTON, WON_ICON, BETTER_LUCK_ICON } from "@/lib/media";
+import { SPIN_WHEEL_BORDER, SPIN_NOW_BUTTON, STOP_BUTTON, WON_ICON, BETTER_LUCK_ICON } from "@/lib/media";
+import { isFundedAccountPrize, FUNDED_ACCOUNT_NOTE } from "@/lib/prizes";
 
-const SPINS = 5;
+// Constant angular speed of the free spin (before Stop is pressed).
+const SPIN_SPEED_DEG_PER_SEC = 720;
+// Extra full turns the wheel makes while decelerating into its landing spot,
+// on top of whatever rotation it already has from the free spin.
+const LANDING_SPINS = 3;
+// Pause after the wheel physically stops, before the countdown modal pops up
+// — gives the player a moment to actually see where it landed.
+const LANDED_PAUSE_MS = 900;
 const WHEEL_SIZE = 953.297;
 const BORDER_ROTATION_DEG = 0; // tweak this to nudge the border ring's light pattern
 
@@ -57,10 +67,17 @@ function SpinGameInner() {
   const blurPx = useTransform(rotationVelocity, [-2000, 0, 2000], [6, 0, 6], { clamp: true });
   const discFilter = useTransform(blurPx, (b) => `blur(${b}px)`);
   const [segments, setSegments] = useState<SpinSegment[]>(DEFAULT_SPIN_SEGMENTS);
-  const [spinning, setSpinning] = useState(false);
-  const [result, setResult] = useState<{ status: "WON" | "LOST"; segmentLabel: string; prizeLabel: string | null } | null>(null);
+  // idle: not spinning yet. spinning: freely spinning, user controls when it
+  // stops. stopping: decelerating into the resolved segment. revealing: wheel
+  // has physically stopped, holding before the result modal appears.
+  const [phase, setPhase] = useState<"idle" | "spinning" | "stopping" | "revealing">("idle");
+  const [result, setResult] = useState<{ status: "WON" | "LOST" | "AGAIN"; segmentLabel: string; prizeLabel: string | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [alreadyPlayed, setAlreadyPlayed] = useState(false);
+
+  const spinControlsRef = useRef<AnimationPlaybackControls | null>(null);
+  const resolveRef = useRef<Promise<{ res: Response; data: any }> | null>(null);
+  const pendingResultRef = useRef<{ status: "WON" | "LOST" | "AGAIN"; segmentLabel: string; prizeLabel: string | null } | null>(null);
 
   useEffect(() => {
     fetch("/api/game/spin/segments")
@@ -71,40 +88,89 @@ function SpinGameInner() {
       .catch(() => {});
   }, []);
 
-  async function handleSpin() {
-    if (!participantId || spinning) return;
+  // Starts a free, indefinite spin immediately (so the button/wheel react the
+  // instant the player taps it) while the outcome is resolved with the server
+  // in the background — the player only finds out where it lands once they
+  // tap Stop.
+  function startSpin() {
+    if (!participantId || phase !== "idle") return;
     setError(null);
-    setSpinning(true);
+    setPhase("spinning");
+
+    const promise = fetch("/api/game/spin/resolve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ participantId }),
+    }).then(async (res) => ({ res, data: await res.json() }));
+    resolveRef.current = promise;
+
+    // If the server rejects the spin (e.g. already played) while the wheel is
+    // still freely spinning, stop it right away instead of waiting for Stop.
+    promise.then(({ res, data }) => {
+      if (res.status === 409) {
+        spinControlsRef.current?.stop();
+        setAlreadyPlayed(true);
+        setPhase("idle");
+      } else if (!res.ok) {
+        spinControlsRef.current?.stop();
+        setError(data.error ?? "Could not spin");
+        setPhase("idle");
+      }
+    });
+
+    // Long, constant-speed spin — effectively indefinite for a booth session,
+    // stopped early whenever the player taps Stop.
+    const farTarget = rotation.get() + SPIN_SPEED_DEG_PER_SEC * 3600;
+    spinControlsRef.current = animate(rotation, farTarget, { duration: 3600, ease: "linear" });
+  }
+
+  async function stopSpin() {
+    if (phase !== "spinning") return;
+    spinControlsRef.current?.stop();
+    setPhase("stopping");
+
     try {
-      const res = await fetch("/api/game/spin/resolve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ participantId }),
-      });
-      const data = await res.json();
+      const outcome = await resolveRef.current;
+      if (!outcome) throw new Error("Could not spin");
+      const { res, data } = outcome;
       if (res.status === 409) {
         setAlreadyPlayed(true);
-        setSpinning(false);
+        setPhase("idle");
         return;
       }
       if (!res.ok) throw new Error(data.error ?? "Could not spin");
 
+      const current = rotation.get();
       const angle = segmentAngle(segments);
       const center = segmentCenterAngle(segments, data.segmentIndex);
       const jitter = (Math.random() - 0.5) * (angle * 0.6);
-      const targetRotation = SPINS * 360 + (360 - center + jitter);
+      const currentMod = ((current % 360) + 360) % 360;
+      const targetMod = (((360 - center + jitter) % 360) + 360) % 360;
+      const delta = ((targetMod - currentMod) % 360 + 360) % 360;
+      const totalDelta = delta + LANDING_SPINS * 360;
+      const targetRotation = current + totalDelta;
 
-      await animate(rotation, targetRotation, { duration: 5, ease: [0.15, 0.85, 0.25, 1] });
+      // Uniform-deceleration kinematics (v0 → 0 over distance totalDelta):
+      // duration = 2 * distance / v0. Paired with an ease-out curve this keeps
+      // the wheel's speed continuous through the Stop press instead of
+      // jumping to a different speed, then it gradually slows to a stop.
+      const duration = (2 * totalDelta) / SPIN_SPEED_DEG_PER_SEC;
+      await animate(rotation, targetRotation, { duration, ease: "easeOut" });
 
-      setResult(data);
+      // Wheel is now visibly stopped on the result — hold on it for a beat
+      // before the 3, 2, 1 countdown (see CountdownModal below) plays and the
+      // result popup appears.
+      pendingResultRef.current = data;
+      await new Promise((resolve) => setTimeout(resolve, LANDED_PAUSE_MS));
+      setPhase("revealing");
     } catch (err: any) {
       setError(err.message);
-      setSpinning(false);
+      setPhase("idle");
     }
   }
 
   return (
-    <main className="flex h-screen flex-col items-center overflow-hidden  ">
+    <main className="flex min-h-screen h-[100dvh] flex-col items-center overflow-y-auto overflow-x-hidden">
       <VideoBackground />
       <div className="w-full">
         <TopBar />
@@ -144,27 +210,45 @@ function SpinGameInner() {
         </div>
 
         <div className="mt-4 flex h-5 items-center justify-center">
-          {spinning && <p className="text-center text-sm text-white/70">Spinning…</p>}
           {error && <p className="text-center text-xs text-red-400">{error}</p>}
         </div>
 
         <div className="mt-4 w-full max-w-[600px] lg:max-w-[360px]">
           <button
-            onClick={handleSpin}
-            disabled={spinning}
+            onClick={phase === "idle" ? startSpin : phase === "spinning" ? stopSpin : undefined}
+            disabled={phase === "stopping" || phase === "revealing"}
             className="w-full transition-transform active:scale-95 disabled:opacity-50 disabled:active:scale-100"
           >
-            <img src={SPIN_NOW_BUTTON} alt="Spin Now" className="w-full" />
+            <img
+              src={phase === "idle" ? SPIN_NOW_BUTTON : STOP_BUTTON}
+              alt={phase === "idle" ? "Spin Now" : "Stop"}
+              className="w-full"
+            />
           </button>
         </div>
       </div>
 
-      <p className="mt-auto pb-[100px] text-center text-[10px] text-[#FFFFFF]">
+      <p className="mt-auto pb-6 sm:pb-[100px] text-center text-[10px] text-[#FFFFFF]">
         Disclaimer: Charts are simulated (not live) and are for entertainment purposes only.
       </p>
 
-      <Modal open={result !== null}>
-        {result && (
+      <Modal open={phase === "revealing"} contentClassName="w-full max-w-[320px]">
+        <CountdownModal onComplete={() => setResult(pendingResultRef.current)} />
+      </Modal>
+
+      <Modal open={result !== null && result.status === "AGAIN"} contentClassName="w-full max-w-sm">
+        {result && result.status === "AGAIN" && (
+          <SpinAgainModal
+            onContinue={() => {
+              setResult(null);
+              setPhase("idle");
+            }}
+          />
+        )}
+      </Modal>
+
+      <Modal open={result !== null && result.status !== "AGAIN"}>
+        {result && result.status !== "AGAIN" && (
           <ResultModal
             won={result.status === "WON"}
             icon={result.status === "WON" ? WON_ICON : BETTER_LUCK_ICON}
@@ -180,7 +264,13 @@ function SpinGameInner() {
                 "Thanks for playing! We hope to see you again for another chance to win."
               )
             }
-            note={result.status === "WON" ? "Reach out to our sales team to claim your prize." : undefined}
+            note={
+              result.status === "WON"
+                ? isFundedAccountPrize(result.prizeLabel)
+                  ? FUNDED_ACCOUNT_NOTE
+                  : "Reach out to our sales team to claim your prize."
+                : undefined
+            }
           />
         )}
       </Modal>

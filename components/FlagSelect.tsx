@@ -64,7 +64,7 @@ export default function FlagSelect({ value, onChange, options, placeholder, disa
             placeholder="Search…"
             className="w-full border-b border-black/10 px-3 py-2 text-[14px] text-black outline-none"
           />
-          <div className="max-h-[130px] overflow-y-auto py-1">
+          <div className="no-scrollbar max-h-[130px] overflow-y-auto py-1">
             {filtered.length === 0 ? (
               <p className="px-3 py-2 text-[13px] text-black/40">No matches.</p>
             ) : (

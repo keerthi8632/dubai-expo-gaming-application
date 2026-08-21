@@ -31,10 +31,10 @@ export default function HomePage() {
         <img src={LOGO} alt="MH Markets" className="h-8" />
 
         <div className="mx-auto mt-10 flex w-full max-w-[600px] flex-col gap-5 lg:max-w-[360px] lg:gap-3">
-          <button onClick={() => setActiveGame("TRADE")} className="w-full transition-transform active:scale-95">
+          <button onClick={() => openGuestBypass("TRADE")} className="w-full transition-transform active:scale-95">
             <img src={TRADE_PREDICTION_BUTTON} alt="Trade Prediction" className="w-full" />
           </button>
-          <button onClick={() => setActiveGame("SPIN")} className="w-full transition-transform active:scale-95">
+          <button onClick={() => openGuestBypass("SPIN")} className="w-full transition-transform active:scale-95">
             <img src={SPIN_NOW_BUTTON} alt="Spin Wheel" className="w-full" />
           </button>
         </div>
@@ -83,10 +83,10 @@ export default function HomePage() {
       >
         <div
           onClick={(e) => e.stopPropagation()}
-          className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white text-black"
+          className="no-scrollbar relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white text-black"
         >
           <CloseButton onClose={() => setHubspotOpen(false)} />
-          <AlphorixForm formId="dd0d6556f7d7" />
+          <AlphorixForm formId="dd0d6556f7d7" onSubmitted={() => setHubspotOpen(false)} />
         </div>
       </div>
     </main>

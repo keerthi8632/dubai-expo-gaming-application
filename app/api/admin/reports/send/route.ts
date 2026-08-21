@@ -13,6 +13,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No recipients configured" }, { status: 400 });
   }
 
-  await sendDailyReport(recipients);
+  const body = await req.json().catch(() => ({}));
+  const gameType = body?.gameType === "TRADE" || body?.gameType === "SPIN" ? body.gameType : undefined;
+
+  await sendDailyReport(recipients, gameType);
   return NextResponse.json({ ok: true, recipients });
 }

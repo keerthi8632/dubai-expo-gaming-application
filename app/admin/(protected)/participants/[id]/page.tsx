@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import AdminSelect from "@/components/AdminSelect";
 
 type GameSession = {
   id: string;
@@ -70,16 +71,16 @@ export default function ParticipantDetailPage() {
 
               <div className="mt-4">
                 <label className="text-xs font-medium text-black/70">Force Outcome</label>
-                <select
+                <AdminSelect
                   value={session?.forcedOutcome ?? ""}
                   disabled={saving === game}
                   onChange={(e) => setForcedOutcome(game, (e.target.value || null) as "WIN" | "LOSE" | null)}
-                  className="mt-1 block w-full rounded-lg border px-3 py-2 text-sm"
+                  wrapperClassName="mt-1 block w-full"
                 >
                   <option value="">Auto</option>
                   <option value="WIN">Force Win</option>
                   <option value="LOSE">Force Lose</option>
-                </select>
+                </AdminSelect>
               </div>
             </div>
           );

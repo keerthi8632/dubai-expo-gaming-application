@@ -12,6 +12,7 @@ import AlreadyPlayedModal from "@/components/AlreadyPlayedModal";
 import Modal from "@/components/Modal";
 import VideoBackground from "@/components/VideoBackground";
 import { PREDICT_NOW_BUTTON, WON_ICON, LOSS_ICON, GRAPH_ICON, MODEL_ARROW_ICON } from "@/lib/media";
+import { FUNDED_ACCOUNT_NOTE } from "@/lib/prizes";
 
 const HISTORY_POINTS = 150;
 const IDLE_TICK_MS = 300;
@@ -215,7 +216,7 @@ function TradeGameInner() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col">
+    <main className="flex min-h-screen flex-col overflow-y-auto">
       <VideoBackground />
       <TopBar />
       <div className="mt-2">
@@ -300,6 +301,7 @@ function TradeGameInner() {
                 ? "Great prediction! The market moved in your favor."
                 : "The market moved against your prediction"
             }
+            note={result.status === "WON" ? FUNDED_ACCOUNT_NOTE : undefined}
             detail={
               <div className="flex items-center justify-center gap-3.5 self-stretch rounded-2xl bg-[#F5F6F8] px-3.5 py-4">
                 <div className="flex w-[159px] flex-col">

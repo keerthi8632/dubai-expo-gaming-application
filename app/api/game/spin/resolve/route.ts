@@ -24,6 +24,20 @@ export async function POST(req: NextRequest) {
   const segments = await getSpinSegments();
   const segmentIndex = pickSegmentIndex(segments, (existing?.forcedOutcome as "WIN" | "LOSE" | null) ?? null);
   const segment = segments[segmentIndex];
+
+  // Landing on Spin Again is neither a win nor a loss — leave the session
+  // untouched (still NOT_PLAYED) so the participant's next resolve call is
+  // treated as a fresh attempt instead of being blocked as "already played".
+  if (segment.isSpinAgain) {
+    return NextResponse.json({
+      status: "AGAIN",
+      segmentIndex,
+      segmentLabel: segment.label,
+      prizeLabel: null,
+      claimCode: null,
+    });
+  }
+
   const won = segment.prize !== null;
   const claimCode = won ? crypto.randomUUID().slice(0, 8).toUpperCase() : null;
   const now = new Date();

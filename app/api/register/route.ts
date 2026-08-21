@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
       countryOfResidence: data.countryOfResidence,
       doesTrade: data.doesTrade,
       language: data.language,
+      ...(data.game ? { registeredGame: data.game } : {}),
     },
     create: {
       fullName: data.fullName,
@@ -32,6 +33,7 @@ export async function POST(req: NextRequest) {
       countryOfResidence: data.countryOfResidence,
       doesTrade: data.doesTrade,
       language: data.language,
+      registeredGame: data.game,
     },
   });
 

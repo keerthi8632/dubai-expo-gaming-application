@@ -31,6 +31,12 @@ model Participant {
   doesTrade       Boolean?
   language        String   @default("ENGLISH")
 
+  // Which booth game the registration form was opened for — "TRADE" | "SPIN".
+  // Kept separate from GameSession.gameType since a session is only created
+  // once the participant actually plays, but we want to report/filter on
+  // registrations regardless of whether they went on to play.
+  registeredGame  String?
+
   emailVerified   Boolean  @default(false)
   phoneVerified   Boolean  @default(false)
 

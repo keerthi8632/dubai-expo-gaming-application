@@ -9,6 +9,7 @@ export const PREDICTION_FORM_BANNER = "/media/predictionGameFormBanner.svg";
 export const SPIN_FORM_BANNER = "/media/spinwheelFormBanner.svg";
 export const TRADE_PREDICTION_BUTTON = "/media/TRADE PREDICTION.svg";
 export const SPIN_NOW_BUTTON = "/media/spinNowHome.svg";
+export const STOP_BUTTON = "/media/Stop Button.svg";
 export const HOME_BUTTON = "/media/home.svg";
 export const QUIT_BUTTON = "/media/quit.svg";
 export const START_NOW_BUTTON = "/media/startNow.svg";

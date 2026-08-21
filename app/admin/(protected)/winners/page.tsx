@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AdminSelect from "@/components/AdminSelect";
 
 type Winner = {
   id: string;
@@ -12,17 +13,22 @@ type Winner = {
   participant: { fullName: string; email: string; phone: string };
 };
 
+type GameFilter = "" | "TRADE" | "SPIN";
+
 export default function WinnersPage() {
   const [winners, setWinners] = useState<Winner[]>([]);
+  const [gameFilter, setGameFilter] = useState<GameFilter>("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameFilter]);
 
   async function load() {
     setLoading(true);
-    const res = await fetch("/api/admin/winners");
+    const params = gameFilter ? `?gameType=${gameFilter}` : "";
+    const res = await fetch(`/api/admin/winners${params}`);
     const data = await res.json();
     setWinners(data.winners ?? []);
     setLoading(false);
@@ -36,6 +42,15 @@ export default function WinnersPage() {
   return (
     <div>
       <h1 className="mb-4 text-xl font-bold">Winners</h1>
+      <AdminSelect
+        value={gameFilter}
+        onChange={(e) => setGameFilter(e.target.value as GameFilter)}
+        wrapperClassName="mb-4 w-full sm:w-auto"
+      >
+        <option value="">All Games</option>
+        <option value="TRADE">Trade Prediction</option>
+        <option value="SPIN">Spin & Win</option>
+      </AdminSelect>
       <div className="overflow-x-auto rounded-xl bg-white shadow">
         <table className="w-full text-left text-sm">
           <thead className="border-b bg-gray-50 text-xs uppercase text-black/50">

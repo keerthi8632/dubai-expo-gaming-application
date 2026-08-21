@@ -13,6 +13,7 @@ export const registerSchema = z.object({
   countryOfResidence: z.string().min(2).max(60),
   doesTrade: z.boolean().optional(),
   language: z.enum(["ENGLISH", "ARABIC"]).default("ENGLISH"),
+  game: z.enum(["TRADE", "SPIN"]).optional(),
 });
 
 export const updateParticipantSchema = z.object({
@@ -42,10 +43,16 @@ export const setOutcomeSchema = z.object({
 
 export const spinSegmentsSchema = z
   .array(
-    z.object({
-      label: z.string().min(1).max(80),
-      weight: z.number().positive(),
-      prize: z.string().min(1).max(80).nullable(),
-    })
+    z
+      .object({
+        label: z.string().min(1).max(80),
+        weight: z.number().positive(),
+        prize: z.string().min(1).max(80).nullable(),
+        isSpinAgain: z.boolean().optional(),
+      })
+      .refine((s) => !s.isSpinAgain || s.prize === null, {
+        message: "A Spin Again segment can't also have a prize",
+        path: ["prize"],
+      })
   )
   .min(2, "Need at least 2 segments");

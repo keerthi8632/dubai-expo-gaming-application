@@ -24,7 +24,7 @@ export default function TermsModal({ game, onAccept, onDecline }: Props) {
         <CloseButton onClose={onDecline} className="right-6 top-6" />
       </div>
 
-      <div className="flex-1 overflow-y-auto px-[30px] py-5">
+      <div className="no-scrollbar flex-1 overflow-y-auto px-[30px] py-5">
         {copy.sections.map((section) => (
           <Section key={section.heading} section={section} />
         ))}

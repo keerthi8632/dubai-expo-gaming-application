@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import AdminSelect from "@/components/AdminSelect";
 
 type Participant = {
   id: string;
@@ -14,20 +15,25 @@ type Participant = {
   gameSessions: { gameType: "TRADE" | "SPIN"; status: string }[];
 };
 
+type GameFilter = "" | "TRADE" | "SPIN";
+
 export default function ParticipantsPage() {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [q, setQ] = useState("");
+  const [gameFilter, setGameFilter] = useState<GameFilter>("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const t = setTimeout(load, 250);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q]);
+  }, [q, gameFilter]);
 
   async function load() {
     setLoading(true);
-    const res = await fetch(`/api/admin/participants?q=${encodeURIComponent(q)}`);
+    const params = new URLSearchParams({ q });
+    if (gameFilter) params.set("gameType", gameFilter);
+    const res = await fetch(`/api/admin/participants?${params.toString()}`);
     const data = await res.json();
     setParticipants(data.participants ?? []);
     setLoading(false);
@@ -40,12 +46,23 @@ export default function ParticipantsPage() {
   return (
     <div>
       <h1 className="mb-4 text-xl font-bold">Participants</h1>
-      <input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="Search name or email…"
-        className="mb-4 w-full max-w-sm rounded-lg border px-3 py-2 text-sm"
-      />
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search name or email…"
+          className="w-full rounded-lg border px-3 py-2 text-sm sm:max-w-sm"
+        />
+        <AdminSelect
+          value={gameFilter}
+          onChange={(e) => setGameFilter(e.target.value as GameFilter)}
+          wrapperClassName="w-full sm:w-auto"
+        >
+          <option value="">All Games</option>
+          <option value="TRADE">Trade Prediction</option>
+          <option value="SPIN">Spin & Win</option>
+        </AdminSelect>
+      </div>
       <div className="overflow-x-auto rounded-xl bg-white shadow">
         <table className="w-full text-left text-sm">
           <thead className="border-b bg-gray-50 text-xs uppercase text-black/50">
