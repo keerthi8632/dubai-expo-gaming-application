@@ -13,9 +13,9 @@
 .env
 .env*.local
 
-# SQLite databases (local data, don't commit real participant records) —
-# covers dev.db (local dev) and prod.db (production, kept separate on purpose)
-/prisma/*.db
+# dev.db is intentionally committed and shared between dev and the nginx
+# server (single source of truth) — only the transient SQLite WAL/journal
+# sidecar files are ignored.
 /prisma/*.db-journal
 /prisma/*.db-wal
 /prisma/*.db-shm
