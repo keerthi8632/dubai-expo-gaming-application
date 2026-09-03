@@ -79,14 +79,26 @@ function SpinGameInner() {
   const resolveRef = useRef<Promise<{ res: Response; data: any }> | null>(null);
   const pendingResultRef = useRef<{ status: "WON" | "LOST" | "AGAIN"; segmentLabel: string; prizeLabel: string | null } | null>(null);
 
+  // Segments are admin-editable at any time — a kiosk tablet can sit on this
+  // page for hours, so poll for changes instead of only fetching once on
+  // mount. Skipped while a spin is in progress so the wheel doesn't reshape
+  // itself mid-animation; the next idle poll picks up the change.
   useEffect(() => {
-    fetch("/api/game/spin/segments")
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data.segments) && data.segments.length > 0) setSegments(data.segments);
-      })
-      .catch(() => {});
-  }, []);
+    function loadSegments() {
+      fetch("/api/game/spin/segments")
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data.segments) && data.segments.length > 0) setSegments(data.segments);
+        })
+        .catch(() => {});
+    }
+
+    loadSegments();
+    const interval = setInterval(() => {
+      if (phase === "idle") loadSegments();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [phase]);
 
   // Starts a free, indefinite spin immediately (so the button/wheel react the
   // instant the player taps it) while the outcome is resolved with the server

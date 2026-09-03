@@ -4,6 +4,7 @@ import { toJson } from "@/lib/json";
 import { z } from "zod";
 import { pickSegmentIndex } from "@/lib/spinSegments";
 import { getSpinSegments } from "@/lib/spinConfig";
+import { getSpinPrizeLimits, getWonPrizeCounts } from "@/lib/spinPrizeLimits";
 
 const schema = z.object({ participantId: z.string().cuid() });
 
@@ -22,7 +23,27 @@ export async function POST(req: NextRequest) {
   }
 
   const segments = await getSpinSegments();
-  const segmentIndex = pickSegmentIndex(segments, (existing?.forcedOutcome as "WIN" | "LOSE" | null) ?? null);
+
+  // Prizes have a fixed physical stock shared across the whole event (both
+  // days) — once a prize's stock is gone, its segment(s) are excluded from
+  // the winnable pool entirely, regardless of forced outcome or weight.
+  const [limits, wonCounts] = await Promise.all([getSpinPrizeLimits(), getWonPrizeCounts()]);
+  const soldOutIndices = new Set(
+    segments
+      .map((s, i) => i)
+      .filter((i) => {
+        const prize = segments[i].prize;
+        if (!prize) return false;
+        const limit = limits[prize];
+        return limit !== undefined && (wonCounts[prize] ?? 0) >= limit;
+      })
+  );
+
+  const segmentIndex = pickSegmentIndex(
+    segments,
+    (existing?.forcedOutcome as "WIN" | "LOSE" | null) ?? null,
+    soldOutIndices
+  );
   const segment = segments[segmentIndex];
 
   // Landing on Spin Again is neither a win nor a loss — leave the session

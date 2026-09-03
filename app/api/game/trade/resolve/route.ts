@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { toJson, fromJson } from "@/lib/json";
+import { canAwardWin } from "@/lib/tradeWinSlots";
 import { z } from "zod";
 
 const schema = z.object({
@@ -25,13 +26,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Already played" }, { status: 409 });
   }
 
+  const now = new Date();
+
   let won: boolean;
-  if (existing?.forcedOutcome === "WIN") won = true;
-  else if (existing?.forcedOutcome === "LOSE") won = false;
-  else {
+  if (existing?.forcedOutcome === "LOSE") won = false;
+  else if (existing?.forcedOutcome === "WIN") {
+    // Prize budget is fixed at 5 wins/day (one per slot) — even an admin's
+    // forced win is blocked if the current slot is already full.
+    won = await canAwardWin(prisma, now);
+  } else {
     const config = await prisma.gameConfig.findUnique({ where: { key: "trade_default_win_rate" } });
     const rate = fromJson<{ rate?: number }>(config?.value, {}).rate ?? DEFAULT_WIN_RATE;
-    won = Math.random() < rate;
+    won = (await canAwardWin(prisma, now)) && Math.random() < rate;
   }
 
   // The chart's actual movement direction always matches the prediction when the
@@ -39,11 +45,10 @@ export async function POST(req: NextRequest) {
   // Buy/Sell call decided the outcome, while WON/LOST itself stays fully governed
   // by the forced-outcome/win-rate logic above (admin control is unaffected).
   const priceGoesUp = won ? prediction === "BUY" : prediction === "SELL";
-  const delta = entryPrice * (0.005 + Math.random() * 0.015);
+  const delta = entryPrice * (0.001 + Math.random() * 0.003);
   const exitPrice = Number((priceGoesUp ? entryPrice + delta : entryPrice - delta).toFixed(2));
 
   const claimCode = won ? crypto.randomUUID().slice(0, 8).toUpperCase() : null;
-  const now = new Date();
 
   const session = await prisma.gameSession.upsert({
     where: { participantId_gameType: { participantId, gameType: "TRADE" } },

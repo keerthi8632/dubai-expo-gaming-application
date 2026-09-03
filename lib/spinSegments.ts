@@ -11,12 +11,12 @@ export type SpinSegment = {
 };
 
 export const DEFAULT_SPIN_SEGMENTS: SpinSegment[] = [
-  { label: "Better Luck Next Time", weight: 35, prize: null },
-  { label: "Branded Merchandise", weight: 25, prize: "Branded Merchandise" },
-  { label: "USD 100 Funded Account*", weight: 9, prize: "USD 100 Funded Account" },
-  { label: "Grand Prize - USD 1,000 Funded Account*", weight: 1, prize: "USD 1,000 Funded Account" },
-  { label: "Exclusive Access to Our Trading Academy", weight: 15, prize: "Trading Academy Access" },
-  { label: "Spin Again", weight: 15, prize: null, isSpinAgain: true },
+  { label: "Premium Merchandise", weight: 90, prize: "Premium Merchandise" },
+  { label: "Amazon Vouchers", weight: 15, prize: "Amazon Vouchers" },
+  { label: "$100 Funded Account", weight: 9, prize: "USD 100 Funded Account" },
+  { label: "$1,000 Funded Account – Jackpot", weight: 3, prize: "USD 1,000 Funded Account" },
+  { label: "Spin Again", weight: 80, prize: null, isSpinAgain: true },
+  { label: "Not This Time, Thank You.", weight: 40, prize: null },
 ];
 
 export function segmentAngle(segments: SpinSegment[]): number {
@@ -39,8 +39,12 @@ function pickWeightedIndex(segments: SpinSegment[], indices: number[]): number {
   return indices[indices.length - 1];
 }
 
-export function pickSegmentIndex(segments: SpinSegment[], forcedOutcome: "WIN" | "LOSE" | null): number {
-  const allIndices = segments.map((_, i) => i);
+export function pickSegmentIndex(
+  segments: SpinSegment[],
+  forcedOutcome: "WIN" | "LOSE" | null,
+  soldOutIndices: ReadonlySet<number> = new Set()
+): number {
+  const allIndices = segments.map((_, i) => i).filter((i) => !soldOutIndices.has(i));
   // Forced outcomes must be definitive, so Spin Again segments are excluded
   // from both pools — a forced WIN/LOSE should never resolve to "try again".
   const loseIndices = allIndices.filter((i) => segments[i].prize === null && !segments[i].isSpinAgain);
@@ -49,8 +53,11 @@ export function pickSegmentIndex(segments: SpinSegment[], forcedOutcome: "WIN" |
   if (forcedOutcome === "LOSE" && loseIndices.length > 0) {
     return pickWeightedIndex(segments, loseIndices);
   }
-  if (forcedOutcome === "WIN" && winIndices.length > 0) {
-    return pickWeightedIndex(segments, winIndices);
+  if (forcedOutcome === "WIN") {
+    // If every remaining prize is sold out, fall back to a loss instead of
+    // honoring the forced win — the physical stock is the hard limit.
+    if (winIndices.length > 0) return pickWeightedIndex(segments, winIndices);
+    if (loseIndices.length > 0) return pickWeightedIndex(segments, loseIndices);
   }
   return pickWeightedIndex(segments, allIndices);
 }
