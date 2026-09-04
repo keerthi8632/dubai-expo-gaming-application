@@ -8,10 +8,10 @@ type Props = {
 
 export default function PredictionModal({ price, onPredict, disabled }: Props) {
   return (
-    <div className="flex w-[500px] max-w-[800px] flex-col items-center gap-4 rounded-2xl bg-white p-6 text-black">
-      <p className="text-center text-[14px] font-medium uppercase tracking-wide text-black/50">Market frozen</p>
-      <h2 className="text-center font-space-grotesk text-[30px] font-bold text-[#d81618]">Which way will it move?</h2>
-      <p className="text-center text-3xl font-bold">{price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+    <div className="flex w-[500px] max-w-[800px] flex-col items-center gap-2 rounded-2xl bg-white p-6 text-black">
+      <p className="text-center font-sans text-[14px] font-normal leading-[21.75px] tracking-normal text-[#70757E]">Market frozen</p>
+      <span className="text-center font-space-grotesk text-[30px] font-bold text-[#d81618]">Which way will it move?</span>
+      <p className="text-center text-3xl font-bold mb-6">{price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
 
       <div className="flex w-full gap-3">
         <button

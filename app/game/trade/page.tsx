@@ -50,7 +50,7 @@ function TradeGameInner() {
   const [phase, setPhase] = useState<"idle" | "frozen" | "countdown" | "revealing" | "done">("idle");
   const [entryPrice, setEntryPrice] = useState(0);
   const [livePrice, setLivePrice] = useState<number | null>(null);
-  const [result, setResult] = useState<{ status: "WON" | "LOST"; entryPrice: number; exitPrice: number } | null>(null);
+  const [result, setResult] = useState<{ status: "WON" | "LOST"; entryPrice: number; exitPrice: number; otherGamePlayed?: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [alreadyPlayed, setAlreadyPlayed] = useState(false);
   const resolveRef = useRef<Promise<{ res: Response; data: any }> | null>(null);
@@ -293,8 +293,11 @@ function TradeGameInner() {
       <Modal open={phase === "done" && result !== null}>
         {result && (
           <ResultModal
+            game="TRADE"
+            participantId={participantId ?? ""}
             won={result.status === "WON"}
             icon={result.status === "WON" ? WON_ICON : LOSS_ICON}
+            showPlayAnother={!result.otherGamePlayed}
             title={result.status === "WON" ? "You Won!" : "You Lost!"}
             subtitle={
               result.status === "WON"

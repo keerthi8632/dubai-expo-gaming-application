@@ -45,7 +45,13 @@ export async function POST(req: NextRequest) {
   // Buy/Sell call decided the outcome, while WON/LOST itself stays fully governed
   // by the forced-outcome/win-rate logic above (admin control is unaffected).
   const priceGoesUp = won ? prediction === "BUY" : prediction === "SELL";
-  const delta = entryPrice * (0.001 + Math.random() * 0.003);
+  // A fixed points range instead of a percentage of entryPrice — the move
+  // should look the same small size regardless of where the price happens
+  // to be sitting, and stay sub-1-point so only the decimals change, not
+  // the whole-number part of the price.
+  const MIN_POINTS_DELTA = 0.05;
+  const MAX_POINTS_DELTA = 0.95;
+  const delta = MIN_POINTS_DELTA + Math.random() * (MAX_POINTS_DELTA - MIN_POINTS_DELTA);
   const exitPrice = Number((priceGoesUp ? entryPrice + delta : entryPrice - delta).toFixed(2));
 
   const claimCode = won ? crypto.randomUUID().slice(0, 8).toUpperCase() : null;
@@ -72,10 +78,18 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  // One entry per game, and only two games exist — the FE uses this to hide
+  // "Play Another Game" once there's genuinely nothing left to play.
+  const otherGame = await prisma.gameSession.findUnique({
+    where: { participantId_gameType: { participantId, gameType: "SPIN" } },
+  });
+  const otherGamePlayed = !!otherGame && otherGame.status !== "NOT_PLAYED";
+
   return NextResponse.json({
     status: session.status,
     entryPrice,
     exitPrice,
     claimCode: session.claimCode,
+    otherGamePlayed,
   });
 }

@@ -12,7 +12,7 @@ import CountdownModal from "@/components/CountdownModal";
 import Modal from "@/components/Modal";
 import VideoBackground from "@/components/VideoBackground";
 import { DEFAULT_SPIN_SEGMENTS, SpinSegment, segmentAngle, segmentCenterAngle } from "@/lib/spinSegments";
-import { SPIN_WHEEL_BORDER, SPIN_NOW_BUTTON, STOP_BUTTON, WON_ICON, BETTER_LUCK_ICON } from "@/lib/media";
+import { SPIN_WHEEL_BORDER, SPIN_NOW  , STOP_BUTTON, WON_ICON, BETTER_LUCK_ICON } from "@/lib/media";
 import { isFundedAccountPrize, FUNDED_ACCOUNT_NOTE } from "@/lib/prizes";
 
 // Constant angular speed of the free spin (before Stop is pressed).
@@ -71,13 +71,13 @@ function SpinGameInner() {
   // stops. stopping: decelerating into the resolved segment. revealing: wheel
   // has physically stopped, holding before the result modal appears.
   const [phase, setPhase] = useState<"idle" | "spinning" | "stopping" | "revealing">("idle");
-  const [result, setResult] = useState<{ status: "WON" | "LOST" | "AGAIN"; segmentLabel: string; prizeLabel: string | null } | null>(null);
+  const [result, setResult] = useState<{ status: "WON" | "LOST" | "AGAIN"; segmentLabel: string; prizeLabel: string | null; otherGamePlayed?: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [alreadyPlayed, setAlreadyPlayed] = useState(false);
 
   const spinControlsRef = useRef<AnimationPlaybackControls | null>(null);
   const resolveRef = useRef<Promise<{ res: Response; data: any }> | null>(null);
-  const pendingResultRef = useRef<{ status: "WON" | "LOST" | "AGAIN"; segmentLabel: string; prizeLabel: string | null } | null>(null);
+  const pendingResultRef = useRef<{ status: "WON" | "LOST" | "AGAIN"; segmentLabel: string; prizeLabel: string | null; otherGamePlayed?: boolean } | null>(null);
 
   // Segments are admin-editable at any time — a kiosk tablet can sit on this
   // page for hours, so poll for changes instead of only fetching once on
@@ -232,7 +232,7 @@ function SpinGameInner() {
             className="w-full transition-transform active:scale-95 disabled:opacity-50 disabled:active:scale-100"
           >
             <img
-              src={phase === "idle" ? SPIN_NOW_BUTTON : STOP_BUTTON}
+              src={phase === "idle" ? SPIN_NOW : STOP_BUTTON}
               alt={phase === "idle" ? "Spin Now" : "Stop"}
               className="w-full"
             />
@@ -262,10 +262,13 @@ function SpinGameInner() {
       <Modal open={result !== null && result.status !== "AGAIN"}>
         {result && result.status !== "AGAIN" && (
           <ResultModal
+            game="SPIN"
+            participantId={participantId ?? ""}
             won={result.status === "WON"}
             icon={result.status === "WON" ? WON_ICON : BETTER_LUCK_ICON}
             badge={result.status === "WON" ? `🎁 ${result.prizeLabel}` : undefined}
-            title={result.status === "WON" ? "You Won!" : "Better Luck Next Time!"}
+            showPlayAnother={!result.otherGamePlayed}
+            title={result.status === "WON" ? "You Won!" : "Not This Time, Thank You."}
             subtitle={
               result.status === "WON" ? (
                 <>
@@ -283,6 +286,7 @@ function SpinGameInner() {
                   : "Reach out to our sales team to claim your prize."
                 : undefined
             }
+            showFundedAccountTerms={result.status === "WON" && isFundedAccountPrize(result.prizeLabel)}
           />
         )}
       </Modal>

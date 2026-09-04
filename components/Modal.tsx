@@ -1,7 +1,8 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 type Props = {
   open: boolean;
@@ -12,7 +13,16 @@ type Props = {
 };
 
 export default function Modal({ open, onClose, dismissible = false, contentClassName = "w-full max-w-sm", children }: Props) {
-  return (
+  // Portaled straight to <body> so this always covers the real viewport,
+  // regardless of nesting depth — a `position: fixed` element is otherwise
+  // trapped inside the nearest ancestor with a `transform` (which framer-motion
+  // sets inline for scale/slide animations), so a Modal rendered inside
+  // another animated Modal would render squashed inside it instead of on top.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -34,6 +44,7 @@ export default function Modal({ open, onClose, dismissible = false, contentClass
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
