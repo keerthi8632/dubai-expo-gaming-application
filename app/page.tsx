@@ -48,7 +48,34 @@ function HomeInner() {
   const existingParticipantId = searchParams.get("participantId");
   const [formOpen, setFormOpen] = useState(false);
   const [termsGame, setTermsGame] = useState<"TRADE" | "SPIN" | null>(null);
-  const [registration, setRegistration] = useState<AlphorixSubmission | undefined>(undefined);
+  // Seeded from the /alphorix/thank-you redirect's query params, for the
+  // case where that redirect broke out of the iframe to the top level
+  // instead of arriving as a postMessage (see the effect below).
+  const [registration, setRegistration] = useState<AlphorixSubmission | undefined>(() => {
+    const firstName = searchParams.get("firstName") ?? undefined;
+    const lastName = searchParams.get("lastName") ?? undefined;
+    const email = searchParams.get("email") ?? undefined;
+    const phone = searchParams.get("phone") ?? undefined;
+    return firstName || lastName || email || phone ? { firstName, lastName, email, phone } : undefined;
+  });
+
+  // Alphorix's Thank-you URL redirect lands on /alphorix/thank-you, which
+  // postMessages the lead's fields back here if it loaded inside the
+  // AlphorixForm iframe below — this is the reliable path (the AlphorixForm
+  // component's own postMessage-sniffing is only a fallback for when the
+  // redirect isn't wired up yet).
+  useEffect(() => {
+    function handleThankYouMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+      if (!event.data || event.data.type !== "alphorix-thank-you") return;
+      const { firstName, lastName, email, phone } = event.data;
+      setRegistration({ firstName, lastName, email, phone });
+      setFormOpen(false);
+      setStage("gameHome");
+    }
+    window.addEventListener("message", handleThankYouMessage);
+    return () => window.removeEventListener("message", handleThankYouMessage);
+  }, []);
 
   // Which games this participant has already completed — checked against the
   // DB (not just the single ?played= param) so both buttons disable once
@@ -132,9 +159,6 @@ function HomeInner() {
                 className="w-full"
               />
             </button>
-            <Link href="/leaderboard" className="mt-2 text-center text-white underline decoration-solid underline-offset-2" style={LEADERBOARD_LINK_STYLE}>
-              Leaderboard
-            </Link>
           </div>
         )}
 

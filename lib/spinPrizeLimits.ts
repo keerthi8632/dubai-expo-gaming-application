@@ -20,6 +20,17 @@ export async function getSpinPrizeLimits(): Promise<Record<string, number>> {
 
 // How many of each prize have already been won, across the entire event
 // (no daily reset — the stock is shared across both days).
+// The jackpot is only available through the last day of the event — after
+// this date its segment is excluded from the winnable pool entirely, the
+// same way a sold-out prize is (see excludedIndices in resolve/route.ts).
+export const JACKPOT_PRIZE_LABEL = "USD 1,000 Funded Account";
+export const JACKPOT_LAST_AVAILABLE_DATE = "2026-09-23";
+
+export function isJackpotExpired(now: Date = new Date()): boolean {
+  const cutoff = new Date(`${JACKPOT_LAST_AVAILABLE_DATE}T23:59:59.999Z`);
+  return now > cutoff;
+}
+
 export async function getWonPrizeCounts(): Promise<Record<string, number>> {
   const rows = await prisma.gameSession.groupBy({
     by: ["prizeLabel"],

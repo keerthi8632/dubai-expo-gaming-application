@@ -2,7 +2,19 @@
 
 import { useEffect, useState } from "react";
 
-type SpinSegment = { label: string; weight: number; prize: string | null; isSpinAgain?: boolean };
+type SpinSegment = {
+  label: string;
+  weight: number;
+  prize: string | null;
+  isSpinAgain?: boolean;
+  dailyQueueCount?: number;
+};
+type SpinEventWindow = { startHour: number; startMinute: number; endHour: number; endMinute: number };
+
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 export default function ConfigPage() {
   const [rate, setRate] = useState(40);
@@ -14,9 +26,28 @@ export default function ConfigPage() {
   const [segmentsSaved, setSegmentsSaved] = useState(false);
   const [segmentsError, setSegmentsError] = useState<string | null>(null);
 
+  const [queueDate, setQueueDate] = useState(todayKey);
+  const [queue, setQueue] = useState<string[]>([]);
+  const [eventWindow, setEventWindow] = useState<SpinEventWindow>({
+    startHour: 10,
+    startMinute: 0,
+    endHour: 18,
+    endMinute: 0,
+  });
+  const [addPrize, setAddPrize] = useState("");
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [queueSaving, setQueueSaving] = useState(false);
+  const [queueSaved, setQueueSaved] = useState(false);
+  const [queueError, setQueueError] = useState<string | null>(null);
+
   useEffect(() => {
     load();
   }, []);
+
+  useEffect(() => {
+    loadQueue(queueDate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queueDate]);
 
   async function load() {
     const [configRes, segmentsRes] = await Promise.all([
@@ -30,6 +61,79 @@ export default function ConfigPage() {
     const segmentsData = await segmentsRes.json();
     if (Array.isArray(segmentsData.segments)) setSegments(segmentsData.segments);
   }
+
+  async function loadQueue(date: string) {
+    setQueueError(null);
+    const res = await fetch(`/api/admin/spin-queue?date=${date}`);
+    const data = await res.json();
+    if (Array.isArray(data.queue)) setQueue(data.queue);
+    if (data.eventWindow) setEventWindow(data.eventWindow);
+  }
+
+  function moveQueueItem(from: number, to: number) {
+    setQueue((prev) => {
+      const next = [...prev];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
+  }
+
+  function removeQueueItem(i: number) {
+    setQueue((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  function addQueueItem() {
+    if (!addPrize) return;
+    setQueue((prev) => [...prev, addPrize]);
+  }
+
+  async function shuffleQueue() {
+    setQueueError(null);
+    const res = await fetch("/api/admin/spin-queue", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date: queueDate }),
+    });
+    const data = await res.json();
+    if (Array.isArray(data.queue)) setQueue(data.queue);
+  }
+
+  async function saveQueue() {
+    setQueueSaving(true);
+    setQueueSaved(false);
+    setQueueError(null);
+    try {
+      const res = await fetch("/api/admin/spin-queue", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: queueDate, queue }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.formErrors?.[0] ?? "Could not save queue");
+      setQueueSaved(true);
+    } catch (err: any) {
+      setQueueError(err.message);
+    } finally {
+      setQueueSaving(false);
+    }
+  }
+
+  async function saveEventWindow(next: SpinEventWindow) {
+    setEventWindow(next);
+    await fetch("/api/admin/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: "spin_event_window", value: next }),
+    });
+  }
+
+  const totalEventMinutes =
+    eventWindow.endHour * 60 + eventWindow.endMinute - (eventWindow.startHour * 60 + eventWindow.startMinute);
+  const windowMinutes = queue.length > 0 ? totalEventMinutes / queue.length : 0;
+  const winnablePrizes = Array.from(
+    new Set(segments.filter((s) => s.prize).map((s) => s.prize as string))
+  );
 
   async function save() {
     setSaving(true);
@@ -48,7 +152,7 @@ export default function ConfigPage() {
   }
 
   function addSegment() {
-    setSegments((prev) => [...prev, { label: "New Segment", weight: 10, prize: null }]);
+    setSegments((prev) => [...prev, { label: "New Segment", weight: 10, prize: null, dailyQueueCount: 0 }]);
   }
 
   function removeSegment(index: number) {
@@ -107,7 +211,8 @@ export default function ConfigPage() {
           Add, remove, or edit wheel segments. Leave <strong>Prize</strong> empty to make it a losing segment, or check{" "}
           <strong>Spin Again</strong> to give the participant another spin instead (no prize, no win or loss recorded).
           Weight controls how likely a segment is relative to the others (higher = more likely) when the outcome isn't
-          forced.
+          forced. <strong>Daily Qty</strong> is how many of that prize go into each day's scheduled queue (see Prize
+          Queue below) — spins outside the queue's scheduled windows can never win a prize, only Spin Again or lose.
         </p>
 
         <div className="mt-4 overflow-x-auto">
@@ -118,6 +223,7 @@ export default function ConfigPage() {
                 <th className="py-2 pr-3">Prize (empty = lose)</th>
                 <th className="py-2 pr-3">Spin Again</th>
                 <th className="py-2 pr-3">Weight</th>
+                <th className="py-2 pr-3">Daily Qty</th>
                 <th className="py-2" />
               </tr>
             </thead>
@@ -161,6 +267,17 @@ export default function ConfigPage() {
                       className="w-20 rounded border px-2 py-1"
                     />
                   </td>
+                  <td className="py-2 pr-3">
+                    <input
+                      type="number"
+                      min={0}
+                      value={seg.dailyQueueCount ?? 0}
+                      onChange={(e) => updateSegment(i, { dailyQueueCount: Math.max(0, Number(e.target.value) || 0) })}
+                      disabled={seg.isSpinAgain || !seg.prize}
+                      title={seg.isSpinAgain || !seg.prize ? "Only applies to prize segments" : undefined}
+                      className="w-20 rounded border px-2 py-1 disabled:bg-black/5 disabled:text-black/30"
+                    />
+                  </td>
                   <td className="py-2">
                     <button
                       onClick={() => removeSegment(i)}
@@ -196,6 +313,109 @@ export default function ConfigPage() {
           className="mt-4 block rounded-lg bg-brand-red px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
         >
           {segmentsSaving ? "Saving…" : segmentsSaved ? "Saved ✓" : "Save Segments"}
+        </button>
+      </div>
+
+      <div className="rounded-xl bg-white p-5 shadow">
+        <h2 className="font-semibold">Spin & Win — Prize Queue</h2>
+        <p className="mt-1 text-xs text-black/50">
+          Each event day is split into equal time windows across the hours below, and the first spin in a window
+          wins that window's prize from the queue — everything else outside an active window can only land on Spin
+          Again or a loss. Drag rows to reorder, or shuffle for a fresh random order.
+        </p>
+
+        <div className="mt-4 flex flex-wrap items-end gap-4">
+          <label className="flex flex-col text-xs font-medium text-black/60">
+            Day
+            <input
+              type="date"
+              value={queueDate}
+              onChange={(e) => setQueueDate(e.target.value)}
+              className="mt-1 rounded border px-2 py-1 text-sm"
+            />
+          </label>
+          <label className="flex flex-col text-xs font-medium text-black/60">
+            Event start
+            <input
+              type="time"
+              value={`${String(eventWindow.startHour).padStart(2, "0")}:${String(eventWindow.startMinute).padStart(2, "0")}`}
+              onChange={(e) => {
+                const [h, m] = e.target.value.split(":").map(Number);
+                saveEventWindow({ ...eventWindow, startHour: h, startMinute: m });
+              }}
+              className="mt-1 rounded border px-2 py-1 text-sm"
+            />
+          </label>
+          <label className="flex flex-col text-xs font-medium text-black/60">
+            Event end
+            <input
+              type="time"
+              value={`${String(eventWindow.endHour).padStart(2, "0")}:${String(eventWindow.endMinute).padStart(2, "0")}`}
+              onChange={(e) => {
+                const [h, m] = e.target.value.split(":").map(Number);
+                saveEventWindow({ ...eventWindow, endHour: h, endMinute: m });
+              }}
+              className="mt-1 rounded border px-2 py-1 text-sm"
+            />
+          </label>
+          <p className="text-xs text-black/50">
+            {queue.length} prizes · ~{windowMinutes.toFixed(1)} min per window
+          </p>
+        </div>
+
+        <ul className="mt-4 space-y-1.5">
+          {queue.map((prize, i) => (
+            <li
+              key={i}
+              draggable
+              onDragStart={() => setDragIndex(i)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => {
+                if (dragIndex !== null && dragIndex !== i) moveQueueItem(dragIndex, i);
+                setDragIndex(null);
+              }}
+              className="flex cursor-grab items-center gap-3 rounded-lg border bg-black/[0.02] px-3 py-2 text-sm active:cursor-grabbing"
+            >
+              <span className="text-black/30">⠿</span>
+              <span className="w-8 text-xs text-black/40">#{i + 1}</span>
+              <span className="flex-1">{prize}</span>
+              <button onClick={() => removeQueueItem(i)} className="rounded bg-black/10 px-2 py-1 text-xs">
+                Remove
+              </button>
+            </li>
+          ))}
+          {queue.length === 0 && <p className="text-sm text-black/40">Queue is empty.</p>}
+        </ul>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <select
+            value={addPrize}
+            onChange={(e) => setAddPrize(e.target.value)}
+            className="rounded border px-2 py-1.5 text-xs"
+          >
+            <option value="">Add prize…</option>
+            {winnablePrizes.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+          <button onClick={addQueueItem} disabled={!addPrize} className="rounded-lg bg-black/10 px-3 py-1.5 text-xs font-semibold disabled:opacity-40">
+            + Add to Queue
+          </button>
+          <button onClick={shuffleQueue} className="rounded-lg bg-black/10 px-3 py-1.5 text-xs font-semibold">
+            🔀 Shuffle
+          </button>
+        </div>
+
+        {queueError && <p className="mt-3 text-xs text-red-600">{queueError}</p>}
+
+        <button
+          onClick={saveQueue}
+          disabled={queueSaving}
+          className="mt-4 block rounded-lg bg-brand-red px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+        >
+          {queueSaving ? "Saving…" : queueSaved ? "Saved ✓" : "Save Queue"}
         </button>
       </div>
     </div>

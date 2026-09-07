@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { toJson, fromJson } from "@/lib/json";
 import { z } from "zod";
-import { pickSegmentIndex } from "@/lib/spinSegments";
+import { pickSegmentIndex, pickWeightedIndex } from "@/lib/spinSegments";
 import { getSpinSegments } from "@/lib/spinConfig";
-import { getSpinPrizeLimits, getWonPrizeCounts } from "@/lib/spinPrizeLimits";
+import { getSpinPrizeLimits, getWonPrizeCounts, JACKPOT_PRIZE_LABEL, isJackpotExpired } from "@/lib/spinPrizeLimits";
+import { localDateKey, getSpinEventWindow, getSpinQueue, getCurrentWindowIndex, claimQueueSlot } from "@/lib/spinQueue";
 
 const schema = z.object({ participantId: z.string().cuid() });
 
@@ -33,6 +34,7 @@ export async function POST(req: NextRequest) {
   // days) — once a prize's stock is gone, its segment(s) are excluded from
   // the winnable pool entirely, regardless of forced outcome or weight.
   const [limits, wonCounts] = await Promise.all([getSpinPrizeLimits(), getWonPrizeCounts()]);
+  const jackpotExpired = isJackpotExpired();
   const excludedIndices = new Set(
     segments
       .map((s, i) => i)
@@ -40,16 +42,50 @@ export async function POST(req: NextRequest) {
         const seg = segments[i];
         if (seg.isSpinAgain) return spinAgainAlreadyUsed;
         if (!seg.prize) return false;
+        if (seg.prize === JACKPOT_PRIZE_LABEL && jackpotExpired) return true;
         const limit = limits[seg.prize];
         return limit !== undefined && (wonCounts[seg.prize] ?? 0) >= limit;
       })
   );
 
-  const segmentIndex = pickSegmentIndex(
-    segments,
-    (existing?.forcedOutcome as "WIN" | "LOSE" | null) ?? null,
-    excludedIndices
-  );
+  const forcedOutcome = (existing?.forcedOutcome as "WIN" | "LOSE" | null) ?? null;
+  const now = new Date();
+
+  // The scheduled prize queue is the source of truth for *which* prize is
+  // due right now — it's skipped only for a forced LOSE (an admin override
+  // always wins). If no window is currently active, or this window's prize
+  // has already been claimed by someone else, fall through to the normal
+  // pool below instead of forcing a prize.
+  let segmentIndex: number | null = null;
+  if (forcedOutcome !== "LOSE") {
+    const dateKey = localDateKey(now);
+    const [queue, eventWindow] = await Promise.all([getSpinQueue(dateKey, segments), getSpinEventWindow()]);
+    const windowIndex = getCurrentWindowIndex(now, eventWindow, queue.length);
+    if (windowIndex !== null) {
+      const queuedPrize = queue[windowIndex];
+      const candidateIndex = segments.findIndex((s, i) => s.prize === queuedPrize && !excludedIndices.has(i));
+      if (candidateIndex !== -1 && (await claimQueueSlot(dateKey, windowIndex, queuedPrize, participantId))) {
+        segmentIndex = candidateIndex;
+      }
+    }
+  }
+
+  if (segmentIndex === null) {
+    if (forcedOutcome === "WIN") {
+      // Admin override still wins even outside the scheduled queue.
+      segmentIndex = pickSegmentIndex(segments, "WIN", excludedIndices);
+    } else {
+      // No prize due this spin — the day's prize budget is governed entirely
+      // by the queue above, so anything outside it can only land on Spin
+      // Again or a genuine loss, never a prize.
+      const allIndices = segments.map((_, i) => i).filter((i) => !excludedIndices.has(i));
+      const nonPrizeIndices = allIndices.filter((i) => segments[i].prize === null);
+      segmentIndex =
+        nonPrizeIndices.length > 0
+          ? pickWeightedIndex(segments, nonPrizeIndices)
+          : pickSegmentIndex(segments, "LOSE", excludedIndices);
+    }
+  }
   const segment = segments[segmentIndex];
 
   // Landing on Spin Again is neither a win nor a loss — the session stays at
@@ -66,6 +102,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       status: "AGAIN",
+      segments,
       segmentIndex,
       segmentLabel: segment.label,
       prizeLabel: null,
@@ -75,7 +112,6 @@ export async function POST(req: NextRequest) {
 
   const won = segment.prize !== null;
   const claimCode = won ? crypto.randomUUID().slice(0, 8).toUpperCase() : null;
-  const now = new Date();
 
   const session = await prisma.gameSession.upsert({
     where: { participantId_gameType: { participantId, gameType: "SPIN" } },
@@ -108,6 +144,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     status: session.status,
+    segments,
     segmentIndex,
     segmentLabel: segment.label,
     prizeLabel: session.prizeLabel,

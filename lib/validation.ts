@@ -49,6 +49,7 @@ export const spinSegmentsSchema = z
         weight: z.number().positive(),
         prize: z.string().min(1).max(80).nullable(),
         isSpinAgain: z.boolean().optional(),
+        dailyQueueCount: z.number().int().min(0).max(500).optional(),
       })
       .refine((s) => !s.isSpinAgain || s.prize === null, {
         message: "A Spin Again segment can't also have a prize",
@@ -56,3 +57,8 @@ export const spinSegmentsSchema = z
       })
   )
   .min(2, "Need at least 2 segments");
+
+export const spinQueueSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
+  queue: z.array(z.string().min(1).max(80)).min(1, "Queue can't be empty"),
+});

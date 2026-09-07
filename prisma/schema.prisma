@@ -99,6 +99,21 @@ model GameSession {
   @@index([gameType, status])
 }
 
+// Records which participant claimed a given day's queue window (see
+// lib/spinQueue.ts) — the unique constraint is what makes "first spin in
+// the window wins" atomic even if two spins land in the same window at
+// nearly the same instant.
+model SpinQueueClaim {
+  id            String   @id @default(cuid())
+  date          String   // event-day key, "YYYY-MM-DD" local time
+  windowIndex   Int
+  prizeLabel    String
+  participantId String
+  claimedAt     DateTime @default(now())
+
+  @@unique([date, windowIndex])
+}
+
 model Admin {
   id            String   @id @default(cuid())
   email         String   @unique

@@ -152,9 +152,18 @@ function SpinGameInner() {
       }
       if (!res.ok) throw new Error(data.error ?? "Could not spin");
 
+      // Always land on the exact segment array the server resolved against,
+      // not whatever the client's polled `segments` state happens to hold —
+      // otherwise an admin edit landing between the client's last poll and
+      // this resolve call could make the wheel land on (and the modal show)
+      // two different segments for the same spin.
+      const resolvedSegments: SpinSegment[] =
+        Array.isArray(data.segments) && data.segments.length > 0 ? data.segments : segments;
+      if (resolvedSegments !== segments) setSegments(resolvedSegments);
+
       const current = rotation.get();
-      const angle = segmentAngle(segments);
-      const center = segmentCenterAngle(segments, data.segmentIndex);
+      const angle = segmentAngle(resolvedSegments);
+      const center = segmentCenterAngle(resolvedSegments, data.segmentIndex);
       const jitter = (Math.random() - 0.5) * (angle * 0.6);
       const currentMod = ((current % 360) + 360) % 360;
       const targetMod = (((360 - center + jitter) % 360) + 360) % 360;
