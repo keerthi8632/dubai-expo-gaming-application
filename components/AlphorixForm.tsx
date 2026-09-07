@@ -84,6 +84,25 @@ export default function AlphorixForm({ formId, onSubmitted }: Props) {
       // eslint-disable-next-line no-console
       console.log("[AlphorixForm] postMessage received — origin:", event.origin, "data:", event.data);
 
+      // Our own /thank-you page posts this explicit bridge message (same
+      // origin as this app, not alphorix.net) when Alphorix's own
+      // "Thank-you URL" redirect loads it inside this iframe — this is the
+      // reliable path since we control its exact shape, so it's checked
+      // before the generic alphorix.net heuristic below.
+      if (event.origin === window.location.origin) {
+        const data = event.data as Record<string, unknown> | null;
+        if (data?.type === "alphorix-thank-you") {
+          submittedRef.current = true;
+          onSubmitted?.({
+            firstName: typeof data.firstName === "string" ? data.firstName : undefined,
+            lastName: typeof data.lastName === "string" ? data.lastName : undefined,
+            email: typeof data.email === "string" ? data.email : undefined,
+            phone: typeof data.phone === "string" ? data.phone : undefined,
+          });
+        }
+        return;
+      }
+
       if (event.origin !== ALPHORIX_ORIGIN) return;
       if (!looksLikeSubmitSuccess(event.data)) return;
       submittedRef.current = true;
