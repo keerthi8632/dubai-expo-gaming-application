@@ -5,7 +5,14 @@ import { z } from "zod";
 import { pickSegmentIndex, pickWeightedIndex } from "@/lib/spinSegments";
 import { getSpinSegments } from "@/lib/spinConfig";
 import { getSpinPrizeLimits, getWonPrizeCounts, JACKPOT_PRIZE_LABEL, isJackpotExpired } from "@/lib/spinPrizeLimits";
-import { localDateKey, getSpinEventWindow, getSpinQueue, getCurrentWindowIndex, claimQueueSlot } from "@/lib/spinQueue";
+import {
+  localDateKey,
+  getSpinEventWindow,
+  getSpinQueue,
+  getOpenWindowIndex,
+  getNextDueQueueIndex,
+  claimQueueSlot,
+} from "@/lib/spinQueue";
 
 const schema = z.object({ participantId: z.string().cuid() });
 
@@ -53,19 +60,34 @@ export async function POST(req: NextRequest) {
 
   // The scheduled prize queue is the source of truth for *which* prize is
   // due right now — it's skipped only for a forced LOSE (an admin override
-  // always wins). If no window is currently active, or this window's prize
-  // has already been claimed by someone else, fall through to the normal
-  // pool below instead of forcing a prize.
+  // always wins). "Due" means the earliest window at or before the current
+  // one that hasn't been claimed yet, so a missed window's prize carries
+  // over into the next spin instead of vanishing. If nothing is due, or this
+  // window's prize has already been claimed by someone else (e.g. another
+  // kiosk's spin landed a moment earlier), fall through to the normal pool
+  // below instead of forcing a prize.
   let segmentIndex: number | null = null;
   if (forcedOutcome !== "LOSE") {
     const dateKey = localDateKey(now);
     const [queue, eventWindow] = await Promise.all([getSpinQueue(dateKey, segments), getSpinEventWindow()]);
-    const windowIndex = getCurrentWindowIndex(now, eventWindow, queue.length);
-    if (windowIndex !== null) {
-      const queuedPrize = queue[windowIndex];
-      const candidateIndex = segments.findIndex((s, i) => s.prize === queuedPrize && !excludedIndices.has(i));
-      if (candidateIndex !== -1 && (await claimQueueSlot(dateKey, windowIndex, queuedPrize, participantId))) {
-        segmentIndex = candidateIndex;
+    const openIndex = getOpenWindowIndex(now, eventWindow, queue.length);
+    if (openIndex !== null) {
+      // Walk forward past any due windows whose prize can never be won right
+      // now (stock exhausted, jackpot expired) — forfeiting them so a single
+      // dead slot can't permanently block every window scheduled after it.
+      for (let guard = 0; guard <= openIndex; guard++) {
+        const dueIndex = await getNextDueQueueIndex(dateKey, openIndex);
+        if (dueIndex === null) break;
+        const queuedPrize = queue[dueIndex];
+        const candidateIndex = segments.findIndex((s, i) => s.prize === queuedPrize && !excludedIndices.has(i));
+        if (candidateIndex === -1) {
+          await claimQueueSlot(dateKey, dueIndex, queuedPrize, "FORFEITED");
+          continue;
+        }
+        if (await claimQueueSlot(dateKey, dueIndex, queuedPrize, participantId)) {
+          segmentIndex = candidateIndex;
+        }
+        break;
       }
     }
   }

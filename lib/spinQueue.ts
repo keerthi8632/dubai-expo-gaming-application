@@ -86,11 +86,13 @@ export async function saveSpinQueue(dateKey: string, queue: string[]): Promise<v
   });
 }
 
-// Which queue slot (0-based) is currently due, or null if the event isn't
-// running right now. The window spans the whole event day evenly across
-// however many prizes are queued, so a day with an extra jackpot slot gets
-// slightly shorter windows instead of the schedule running past closing time.
-export function getCurrentWindowIndex(now: Date, window: SpinEventWindow, queueLength: number): number | null {
+// How many queue slots (0-based, inclusive) should have "opened" by now, or
+// null if the event isn't running right now. The window spans the whole
+// event day evenly across however many prizes are queued, so a day with an
+// extra jackpot slot gets slightly shorter windows instead of the schedule
+// running past closing time. This is an upper bound, not "the" due slot —
+// see getNextDueQueueIndex for which slot is actually still unclaimed.
+export function getOpenWindowIndex(now: Date, window: SpinEventWindow, queueLength: number): number | null {
   if (queueLength === 0) return null;
   const start = new Date(now);
   start.setHours(window.startHour, window.startMinute, 0, 0);
@@ -103,6 +105,38 @@ export function getCurrentWindowIndex(now: Date, window: SpinEventWindow, queueL
   const elapsedMinutes = (now.getTime() - start.getTime()) / 60000;
   const index = Math.floor(elapsedMinutes / windowMinutes);
   return Math.min(index, queueLength - 1);
+}
+
+// The earliest slot at or before openIndex that hasn't been claimed yet, or
+// null if every slot due so far has already been won. This is what makes a
+// missed window "carry over" — if nobody spun during window 5's 16 minutes,
+// its prize stays the oldest pending one and gets handed to the very next
+// spin (whichever kiosk it comes from), before window 6's prize is even
+// considered.
+export async function getNextDueQueueIndex(dateKey: string, openIndex: number): Promise<number | null> {
+  const claims = await prisma.spinQueueClaim.findMany({
+    where: { date: dateKey, windowIndex: { lte: openIndex } },
+    select: { windowIndex: true },
+  });
+  const claimed = new Set(claims.map((c) => c.windowIndex));
+  for (let i = 0; i <= openIndex; i++) {
+    if (!claimed.has(i)) return i;
+  }
+  return null;
+}
+
+// How many of each prize in a day's queue have already been claimed
+// (including forfeited slots, which are gone for good too) — used to show
+// admins how many of each prize are still left to give away today.
+export async function getQueueClaimCounts(dateKey: string): Promise<Record<string, number>> {
+  const rows = await prisma.spinQueueClaim.groupBy({
+    by: ["prizeLabel"],
+    where: { date: dateKey },
+    _count: { _all: true },
+  });
+  const counts: Record<string, number> = {};
+  for (const row of rows) counts[row.prizeLabel] = row._count._all;
+  return counts;
 }
 
 // Atomically claims a window's prize for a participant — the unique

@@ -11,6 +11,11 @@ type SpinSegment = {
 };
 type SpinEventWindow = { startHour: number; startMinute: number; endHour: number; endMinute: number };
 
+// Must match JACKPOT_LAST_AVAILABLE_DATE in lib/spinPrizeLimits.ts — kept as a
+// plain string here (rather than importing that server-only module) so this
+// client component doesn't pull Prisma into the browser bundle.
+const JACKPOT_DAY = "2026-09-23";
+
 function todayKey() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -39,6 +44,8 @@ export default function ConfigPage() {
   const [queueSaving, setQueueSaving] = useState(false);
   const [queueSaved, setQueueSaved] = useState(false);
   const [queueError, setQueueError] = useState<string | null>(null);
+  const [remainingCounts, setRemainingCounts] = useState<Record<string, number>>({});
+  const [totalCounts, setTotalCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     load();
@@ -68,6 +75,8 @@ export default function ConfigPage() {
     const data = await res.json();
     if (Array.isArray(data.queue)) setQueue(data.queue);
     if (data.eventWindow) setEventWindow(data.eventWindow);
+    setTotalCounts(data.totalCounts ?? {});
+    setRemainingCounts(data.remainingCounts ?? {});
   }
 
   function moveQueueItem(from: number, to: number) {
@@ -112,6 +121,7 @@ export default function ConfigPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error?.formErrors?.[0] ?? "Could not save queue");
       setQueueSaved(true);
+      await loadQueue(queueDate); // refresh remaining/total counts against the newly saved queue
     } catch (err: any) {
       setQueueError(err.message);
     } finally {
@@ -361,6 +371,28 @@ export default function ConfigPage() {
           <p className="text-xs text-black/50">
             {queue.length} prizes · ~{windowMinutes.toFixed(1)} min per window
           </p>
+        </div>
+
+        {queueDate === JACKPOT_DAY && (
+          <p className="mt-3 text-xs font-medium text-amber-600">
+            🏆 This is the jackpot's last available day — the $1,000 Funded Account only ever appears in the queue on{" "}
+            {JACKPOT_DAY}.
+          </p>
+        )}
+
+        <div className="mt-4 rounded-lg bg-black/[0.03] p-3">
+          <p className="text-xs font-semibold uppercase text-black/50">Prizes left today</p>
+          <ul className="mt-2 space-y-1 text-sm">
+            {Object.keys(totalCounts).length === 0 && <li className="text-black/40">No prizes scheduled for this day.</li>}
+            {Object.entries(totalCounts).map(([prize, total]) => (
+              <li key={prize} className="flex items-center justify-between">
+                <span>{prize}</span>
+                <span className="font-semibold">
+                  {Math.max(remainingCounts[prize] ?? total, 0)} / {total} left
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
 
         <ul className="mt-4 space-y-1.5">
