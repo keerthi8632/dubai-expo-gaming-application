@@ -84,7 +84,7 @@ export default function ResultModal({
 
       <div className="flex w-full flex-col items-center gap-2 px-8 pb-8">
         <div className="flex h-[59px] w-full flex-col items-center pt-[18px]">
-          <span className={`text-center text-[30px] font-bold ${won ? "text-[#34c759]" : "text-[#ff3b30]"}`}>{title}</span>
+          <span className={`text-center text-[25px] font-bold ${won ? "text-[#34c759]" : "text-[#ff3b30]"}`}>{title}</span>
         </div>
 
         <div className="flex min-h-[30px] w-full flex-col items-center pt-2">

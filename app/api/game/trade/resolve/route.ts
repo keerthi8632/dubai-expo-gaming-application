@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { toJson, fromJson } from "@/lib/json";
 import { canAwardWin } from "@/lib/tradeWinSlots";
+import { getOtherGameSession } from "@/lib/gameSessions";
 import { z } from "zod";
 
 const schema = z.object({
@@ -27,9 +28,15 @@ export async function POST(req: NextRequest) {
   }
 
   const now = new Date();
+  const otherGame = await getOtherGameSession(participantId, "TRADE");
 
   let won: boolean;
-  if (existing?.forcedOutcome === "LOSE") won = false;
+  if (otherGame?.status === "WON") {
+    // A participant can only ever win one of the two booth games — this is a
+    // hard limit like the prize stock/slot checks below, so it overrides
+    // even an admin's forced win.
+    won = false;
+  } else if (existing?.forcedOutcome === "LOSE") won = false;
   else if (existing?.forcedOutcome === "WIN") {
     // Prize budget is fixed at 5 wins/day (one per slot) — even an admin's
     // forced win is blocked if the current slot is already full.
@@ -80,9 +87,6 @@ export async function POST(req: NextRequest) {
 
   // One entry per game, and only two games exist — the FE uses this to hide
   // "Play Another Game" once there's genuinely nothing left to play.
-  const otherGame = await prisma.gameSession.findUnique({
-    where: { participantId_gameType: { participantId, gameType: "SPIN" } },
-  });
   const otherGamePlayed = !!otherGame && otherGame.status !== "NOT_PLAYED";
 
   return NextResponse.json({

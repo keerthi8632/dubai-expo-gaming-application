@@ -39,6 +39,7 @@ export default function ConfigPage() {
     endHour: 18,
     endMinute: 0,
   });
+  const [minWinGapMinutes, setMinWinGapMinutes] = useState(10);
   const [addPrize, setAddPrize] = useState("");
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [queueSaving, setQueueSaving] = useState(false);
@@ -62,8 +63,11 @@ export default function ConfigPage() {
       fetch("/api/admin/spin-segments"),
     ]);
     const configData = await configRes.json();
-    const config = (configData.configs as { key: string; value: any }[]).find((c) => c.key === "trade_default_win_rate");
-    if (config?.value?.rate != null) setRate(Math.round(config.value.rate * 100));
+    const configs = configData.configs as { key: string; value: any }[];
+    const rateConfig = configs.find((c) => c.key === "trade_default_win_rate");
+    if (rateConfig?.value?.rate != null) setRate(Math.round(rateConfig.value.rate * 100));
+    const gapConfig = configs.find((c) => c.key === "spin_min_win_gap_minutes");
+    if (gapConfig?.value?.minutes != null) setMinWinGapMinutes(gapConfig.value.minutes);
 
     const segmentsData = await segmentsRes.json();
     if (Array.isArray(segmentsData.segments)) setSegments(segmentsData.segments);
@@ -97,7 +101,24 @@ export default function ConfigPage() {
     setQueue((prev) => [...prev, addPrize]);
   }
 
-  async function shuffleQueue() {
+  // Randomizes the order of whatever's currently in the queue — does not
+  // touch which prizes or how many are in it (use "Reset to Defaults" for
+  // that). Purely a client-side reorder, nothing is saved until Save Queue.
+  function shuffleQueue() {
+    setQueue((prev) => {
+      const next = [...prev];
+      for (let i = next.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [next[i], next[j]] = [next[j], next[i]];
+      }
+      return next;
+    });
+  }
+
+  // Rebuilds the queue from scratch using each segment's Daily Qty (see
+  // Segments section above) — this replaces the current list entirely,
+  // including any manual adds/removes.
+  async function resetQueueToDefaults() {
     setQueueError(null);
     const res = await fetch("/api/admin/spin-queue", {
       method: "POST",
@@ -127,6 +148,15 @@ export default function ConfigPage() {
     } finally {
       setQueueSaving(false);
     }
+  }
+
+  async function saveMinWinGapMinutes(minutes: number) {
+    setMinWinGapMinutes(minutes);
+    await fetch("/api/admin/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: "spin_min_win_gap_minutes", value: { minutes } }),
+    });
   }
 
   async function saveEventWindow(next: SpinEventWindow) {
@@ -331,7 +361,9 @@ export default function ConfigPage() {
         <p className="mt-1 text-xs text-black/50">
           Each event day is split into equal time windows across the hours below, and the first spin in a window
           wins that window's prize from the queue — everything else outside an active window can only land on Spin
-          Again or a loss. Drag rows to reorder, or shuffle for a fresh random order.
+          Again or a loss. Drag rows to reorder, or use <strong>Shuffle Order</strong> to randomize the current list.{" "}
+          <strong>Reset to Defaults</strong> instead rebuilds the whole list from each segment's Daily Qty above,
+          discarding any manual changes.
         </p>
 
         <div className="mt-4 flex flex-wrap items-end gap-4">
@@ -368,10 +400,25 @@ export default function ConfigPage() {
               className="mt-1 rounded border px-2 py-1 text-sm"
             />
           </label>
+          <label className="flex flex-col text-xs font-medium text-black/60">
+            Min minutes between wins
+            <input
+              type="number"
+              min={0}
+              value={minWinGapMinutes}
+              onChange={(e) => saveMinWinGapMinutes(Math.max(0, Number(e.target.value) || 0))}
+              className="mt-1 w-28 rounded border px-2 py-1 text-sm"
+            />
+          </label>
           <p className="text-xs text-black/50">
             {queue.length} prizes · ~{windowMinutes.toFixed(1)} min per window
           </p>
         </div>
+        <p className="mt-2 text-xs text-black/50">
+          If nobody plays for a while, missed prizes carry over and stay queued — but no two wins can happen closer
+          together than this gap, even if several prizes have backed up, so a slow start doesn't turn into a burst
+          of back-to-back winners.
+        </p>
 
         {queueDate === JACKPOT_DAY && (
           <p className="mt-3 text-xs font-medium text-amber-600">
@@ -435,8 +482,15 @@ export default function ConfigPage() {
           <button onClick={addQueueItem} disabled={!addPrize} className="rounded-lg bg-black/10 px-3 py-1.5 text-xs font-semibold disabled:opacity-40">
             + Add to Queue
           </button>
-          <button onClick={shuffleQueue} className="rounded-lg bg-black/10 px-3 py-1.5 text-xs font-semibold">
-            🔀 Shuffle
+          <button onClick={shuffleQueue} disabled={queue.length === 0} className="rounded-lg bg-black/10 px-3 py-1.5 text-xs font-semibold disabled:opacity-40">
+            🔀 Shuffle Order
+          </button>
+          <button
+            onClick={resetQueueToDefaults}
+            className="rounded-lg bg-black/10 px-3 py-1.5 text-xs font-semibold"
+            title="Rebuilds the queue from each segment's Daily Qty, replacing the current list"
+          >
+            Reset to Defaults
           </button>
         </div>
 

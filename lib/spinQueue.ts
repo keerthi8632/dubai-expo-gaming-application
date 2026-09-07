@@ -58,6 +58,27 @@ export async function saveSpinEventWindow(window: SpinEventWindow): Promise<void
   });
 }
 
+export const SPIN_MIN_WIN_GAP_CONFIG_KEY = "spin_min_win_gap_minutes";
+export const DEFAULT_SPIN_MIN_WIN_GAP_MINUTES = 10;
+
+// Minimum time that must pass between two Spin wins, regardless of how many
+// prizes are backlogged in the queue — without this, a lull before the event
+// gets going (nobody playing between the scheduled start time and when
+// people actually show up) lets several carried-over prizes queue up, then
+// all get handed out back-to-back the moment testing/play resumes.
+export async function getSpinMinWinGapMinutes(): Promise<number> {
+  const config = await prisma.gameConfig.findUnique({ where: { key: SPIN_MIN_WIN_GAP_CONFIG_KEY } });
+  return fromJson<{ minutes?: number }>(config?.value, {}).minutes ?? DEFAULT_SPIN_MIN_WIN_GAP_MINUTES;
+}
+
+export async function saveSpinMinWinGapMinutes(minutes: number): Promise<void> {
+  await prisma.gameConfig.upsert({
+    where: { key: SPIN_MIN_WIN_GAP_CONFIG_KEY },
+    create: { key: SPIN_MIN_WIN_GAP_CONFIG_KEY, value: toJson({ minutes }) },
+    update: { value: toJson({ minutes }) },
+  });
+}
+
 // Fetches the queue for a given day, generating and persisting a randomly
 // shuffled default the first time that day is looked up — every resolve
 // call and the admin UI then agree on the same queue instead of each
@@ -107,18 +128,24 @@ export function getOpenWindowIndex(now: Date, window: SpinEventWindow, queueLeng
   return Math.min(index, queueLength - 1);
 }
 
+// Which windows at or before openIndex have already been claimed today — one
+// query per resolve call, reused across every step of the due-index walk in
+// resolve/route.ts instead of re-querying per iteration.
+export async function getClaimedWindowIndices(dateKey: string, openIndex: number): Promise<Set<number>> {
+  const claims = await prisma.spinQueueClaim.findMany({
+    where: { date: dateKey, windowIndex: { lte: openIndex } },
+    select: { windowIndex: true },
+  });
+  return new Set(claims.map((c) => c.windowIndex));
+}
+
 // The earliest slot at or before openIndex that hasn't been claimed yet, or
 // null if every slot due so far has already been won. This is what makes a
 // missed window "carry over" — if nobody spun during window 5's 16 minutes,
 // its prize stays the oldest pending one and gets handed to the very next
 // spin (whichever kiosk it comes from), before window 6's prize is even
 // considered.
-export async function getNextDueQueueIndex(dateKey: string, openIndex: number): Promise<number | null> {
-  const claims = await prisma.spinQueueClaim.findMany({
-    where: { date: dateKey, windowIndex: { lte: openIndex } },
-    select: { windowIndex: true },
-  });
-  const claimed = new Set(claims.map((c) => c.windowIndex));
+export function nextDueQueueIndex(claimed: ReadonlySet<number>, openIndex: number): number | null {
   for (let i = 0; i <= openIndex; i++) {
     if (!claimed.has(i)) return i;
   }

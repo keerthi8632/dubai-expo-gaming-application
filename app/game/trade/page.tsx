@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { createChart, IChartApi, ISeriesApi, IPriceLine, LineStyle, UTCTimestamp } from "lightweight-charts";
+import type { IChartApi, ISeriesApi, IPriceLine, UTCTimestamp } from "lightweight-charts";
 import TopBar from "@/components/TopBar";
 import PlayerBadge from "@/components/PlayerBadge";
 import ResultModal from "@/components/ResultModal";
@@ -46,6 +46,11 @@ function TradeGameInner() {
   const liveTimeRef = useRef(0);
   const entryLineRef = useRef<IPriceLine | null>(null);
   const exitLineRef = useRef<IPriceLine | null>(null);
+  // lightweight-charts is a sizeable dependency only this page needs — loaded
+  // via dynamic import() (below) so it's a separate chunk the browser fetches
+  // in parallel instead of blocking this route's initial bundle. Cached here
+  // once loaded so handleStart/handleCountdownComplete can reach LineStyle.
+  const chartModuleRef = useRef<typeof import("lightweight-charts") | null>(null);
 
   const [phase, setPhase] = useState<"idle" | "frozen" | "countdown" | "revealing" | "done">("idle");
   const [entryPrice, setEntryPrice] = useState(0);
@@ -57,55 +62,69 @@ function TradeGameInner() {
 
   useEffect(() => {
     if (!containerRef.current) return;
-    const chart = createChart(containerRef.current, {
-      layout: { background: { color: "#ffffff" }, textColor: "#222" },
-      grid: { vertLines: { color: "#eee" }, horzLines: { color: "#eee" } },
-      rightPriceScale: { borderVisible: false },
-      timeScale: { borderVisible: false, visible: true },
-      height: 460,
+    let disposed = false;
+    let cleanup = () => {};
+
+    import("lightweight-charts").then((mod) => {
+      if (disposed || !containerRef.current) return;
+      chartModuleRef.current = mod;
+      const { createChart } = mod;
+
+      const chart = createChart(containerRef.current, {
+        layout: { background: { color: "#ffffff" }, textColor: "#222" },
+        grid: { vertLines: { color: "#eee" }, horzLines: { color: "#eee" } },
+        rightPriceScale: { borderVisible: false },
+        timeScale: { borderVisible: false, visible: true },
+        height: 460,
+      });
+      const series = chart.addAreaSeries({
+        lineColor: "#2563eb",
+        lineWidth: 2,
+        topColor: "rgba(37, 99, 235, 0.35)",
+        bottomColor: "rgba(37, 99, 235, 0.02)",
+      });
+      chartRef.current = chart;
+      seriesRef.current = series;
+
+      // Seed some trending history so the chart isn't a blank canvas on load.
+      const now = Math.floor(Date.now() / 1000);
+      const startTime = now - HISTORY_POINTS;
+      let price = 7000;
+      const history = [];
+      for (let i = 0; i < HISTORY_POINTS; i++) {
+        const trend = Math.sin(i / 25) * 8;
+        price = clampPrice(price + trend + (Math.random() - 0.5) * 42);
+        history.push({ time: (startTime + i) as UTCTimestamp, value: Number(price.toFixed(2)) });
+      }
+      series.setData(history);
+      livePriceRef.current = price;
+      liveTimeRef.current = startTime + HISTORY_POINTS;
+
+      const resize = () => chart.applyOptions({ width: containerRef.current!.clientWidth });
+      resize();
+      window.addEventListener("resize", resize);
+
+      // Keep the market "alive" — wanders continuously until the player hits Start Now.
+      // Clamped to a floor/ceiling so a long idle period (kiosk sitting between
+      // players) can't drift the price to zero/negative, which the resolve API
+      // rejects (entryPrice must be positive).
+      idleIntervalRef.current = setInterval(() => {
+        liveTimeRef.current += 1;
+        livePriceRef.current = clampPrice(livePriceRef.current + (Math.random() - 0.5) * 38);
+        series.update({ time: liveTimeRef.current as UTCTimestamp, value: Number(livePriceRef.current.toFixed(2)) });
+        chart.timeScale().scrollToRealTime();
+      }, IDLE_TICK_MS);
+
+      cleanup = () => {
+        window.removeEventListener("resize", resize);
+        if (idleIntervalRef.current) clearInterval(idleIntervalRef.current);
+        chart.remove();
+      };
     });
-    const series = chart.addAreaSeries({
-      lineColor: "#2563eb",
-      lineWidth: 2,
-      topColor: "rgba(37, 99, 235, 0.35)",
-      bottomColor: "rgba(37, 99, 235, 0.02)",
-    });
-    chartRef.current = chart;
-    seriesRef.current = series;
-
-    // Seed some trending history so the chart isn't a blank canvas on load.
-    const now = Math.floor(Date.now() / 1000);
-    const startTime = now - HISTORY_POINTS;
-    let price = 7000;
-    const history = [];
-    for (let i = 0; i < HISTORY_POINTS; i++) {
-      const trend = Math.sin(i / 25) * 8;
-      price = clampPrice(price + trend + (Math.random() - 0.5) * 42);
-      history.push({ time: (startTime + i) as UTCTimestamp, value: Number(price.toFixed(2)) });
-    }
-    series.setData(history);
-    livePriceRef.current = price;
-    liveTimeRef.current = startTime + HISTORY_POINTS;
-
-    const resize = () => chart.applyOptions({ width: containerRef.current!.clientWidth });
-    resize();
-    window.addEventListener("resize", resize);
-
-    // Keep the market "alive" — wanders continuously until the player hits Start Now.
-    // Clamped to a floor/ceiling so a long idle period (kiosk sitting between
-    // players) can't drift the price to zero/negative, which the resolve API
-    // rejects (entryPrice must be positive).
-    idleIntervalRef.current = setInterval(() => {
-      liveTimeRef.current += 1;
-      livePriceRef.current = clampPrice(livePriceRef.current + (Math.random() - 0.5) * 38);
-      series.update({ time: liveTimeRef.current as UTCTimestamp, value: Number(livePriceRef.current.toFixed(2)) });
-      chart.timeScale().scrollToRealTime();
-    }, IDLE_TICK_MS);
 
     return () => {
-      window.removeEventListener("resize", resize);
-      if (idleIntervalRef.current) clearInterval(idleIntervalRef.current);
-      chart.remove();
+      disposed = true;
+      cleanup();
     };
   }, []);
 
@@ -135,7 +154,7 @@ function TradeGameInner() {
         price,
         color: "#111827",
         lineWidth: 2,
-        lineStyle: LineStyle.Dashed,
+        lineStyle: chartModuleRef.current!.LineStyle.Dashed,
         axisLabelVisible: true,
         title: "Entry",
       });
@@ -175,7 +194,7 @@ function TradeGameInner() {
             price: data.exitPrice,
             color: data.status === "WON" ? "#34c759" : "#ff3b30",
             lineWidth: 2,
-            lineStyle: LineStyle.Solid,
+            lineStyle: chartModuleRef.current!.LineStyle.Solid,
             axisLabelVisible: true,
             title: "Exit",
           });

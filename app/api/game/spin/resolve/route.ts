@@ -5,13 +5,16 @@ import { z } from "zod";
 import { pickSegmentIndex, pickWeightedIndex } from "@/lib/spinSegments";
 import { getSpinSegments } from "@/lib/spinConfig";
 import { getSpinPrizeLimits, getWonPrizeCounts, JACKPOT_PRIZE_LABEL, isJackpotExpired } from "@/lib/spinPrizeLimits";
+import { getOtherGameSession, getLastSpinWinAt } from "@/lib/gameSessions";
 import {
   localDateKey,
   getSpinEventWindow,
   getSpinQueue,
   getOpenWindowIndex,
-  getNextDueQueueIndex,
+  getClaimedWindowIndices,
+  nextDueQueueIndex,
   claimQueueSlot,
+  getSpinMinWinGapMinutes,
 } from "@/lib/spinQueue";
 
 const schema = z.object({ participantId: z.string().cuid() });
@@ -57,6 +60,27 @@ export async function POST(req: NextRequest) {
 
   const forcedOutcome = (existing?.forcedOutcome as "WIN" | "LOSE" | null) ?? null;
   const now = new Date();
+  const otherGame = await getOtherGameSession(participantId, "SPIN");
+  // A participant can only ever win one of the two booth games — this is a
+  // hard limit like prize stock/jackpot expiry, so it overrides even an
+  // admin's forced win. Treated as if forced LOSE below so this spin never
+  // touches the scheduled queue at all — the window's prize stays unclaimed
+  // for the next spinner instead of being wasted on someone who can't win it.
+  const alreadyWonOtherGame = otherGame?.status === "WON";
+
+  // A backlog of carried-over prizes (e.g. nobody played for the first two
+  // hours after the event "started") shouldn't all be handed out back-to-back
+  // the moment play resumes — enforce a minimum gap since the last win today,
+  // regardless of how many prizes are queued up. An admin's forced WIN is a
+  // deliberate override and still bypasses this, same as everywhere else.
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const [minWinGapMinutes, lastWinAt] = await Promise.all([
+    getSpinMinWinGapMinutes(),
+    getLastSpinWinAt(startOfToday),
+  ]);
+  const withinWinCooldown =
+    lastWinAt !== null && (now.getTime() - lastWinAt.getTime()) / 60000 < minWinGapMinutes;
+  const queueBlockedByCooldown = withinWinCooldown && forcedOutcome !== "WIN";
 
   // The scheduled prize queue is the source of truth for *which* prize is
   // due right now — it's skipped only for a forced LOSE (an admin override
@@ -67,21 +91,25 @@ export async function POST(req: NextRequest) {
   // kiosk's spin landed a moment earlier), fall through to the normal pool
   // below instead of forcing a prize.
   let segmentIndex: number | null = null;
-  if (forcedOutcome !== "LOSE") {
+  if (forcedOutcome !== "LOSE" && !alreadyWonOtherGame && !queueBlockedByCooldown) {
     const dateKey = localDateKey(now);
     const [queue, eventWindow] = await Promise.all([getSpinQueue(dateKey, segments), getSpinEventWindow()]);
     const openIndex = getOpenWindowIndex(now, eventWindow, queue.length);
     if (openIndex !== null) {
+      // Fetched once and updated locally as we forfeit dead slots below,
+      // instead of re-querying claims from the DB on every loop iteration.
+      const claimed = new Set(await getClaimedWindowIndices(dateKey, openIndex));
       // Walk forward past any due windows whose prize can never be won right
       // now (stock exhausted, jackpot expired) — forfeiting them so a single
       // dead slot can't permanently block every window scheduled after it.
       for (let guard = 0; guard <= openIndex; guard++) {
-        const dueIndex = await getNextDueQueueIndex(dateKey, openIndex);
+        const dueIndex = nextDueQueueIndex(claimed, openIndex);
         if (dueIndex === null) break;
         const queuedPrize = queue[dueIndex];
         const candidateIndex = segments.findIndex((s, i) => s.prize === queuedPrize && !excludedIndices.has(i));
         if (candidateIndex === -1) {
           await claimQueueSlot(dateKey, dueIndex, queuedPrize, "FORFEITED");
+          claimed.add(dueIndex);
           continue;
         }
         if (await claimQueueSlot(dateKey, dueIndex, queuedPrize, participantId)) {
@@ -93,7 +121,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (segmentIndex === null) {
-    if (forcedOutcome === "WIN") {
+    if (forcedOutcome === "WIN" && !alreadyWonOtherGame) {
       // Admin override still wins even outside the scheduled queue.
       segmentIndex = pickSegmentIndex(segments, "WIN", excludedIndices);
     } else {
@@ -159,9 +187,6 @@ export async function POST(req: NextRequest) {
 
   // One entry per game, and only two games exist — the FE uses this to hide
   // "Play Another Game" once there's genuinely nothing left to play.
-  const otherGame = await prisma.gameSession.findUnique({
-    where: { participantId_gameType: { participantId, gameType: "TRADE" } },
-  });
   const otherGamePlayed = !!otherGame && otherGame.status !== "NOT_PLAYED";
 
   return NextResponse.json({

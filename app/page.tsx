@@ -201,7 +201,7 @@ function HomeInner() {
         >
           <CloseButton onClose={() => setFormOpen(false)} />
           <AlphorixForm
-            formId="dd0d6556f7d7"
+            formId="57237fa43377"
             onSubmitted={(info) => {
               setRegistration(info);
               setFormOpen(false);
