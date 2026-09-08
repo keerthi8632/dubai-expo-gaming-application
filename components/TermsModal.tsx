@@ -7,7 +7,7 @@ import CloseButton from "./CloseButton";
 type ConsentProps = {
   mode?: "consent";
   game: "TRADE" | "SPIN";
-  onAccept: () => void;
+  onAccept: () => void | Promise<void>;
   onDecline: () => void;
 };
 
@@ -26,7 +26,18 @@ export default function TermsModal(props: Props) {
   const isInfo = props.mode === "info";
   const copy = isInfo ? props.copy : TERMS_COPY[props.game];
   const [accepted, setAccepted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const dismiss = isInfo ? props.onClose : props.onDecline;
+
+  async function handleAccept() {
+    if (isInfo) return;
+    setSubmitting(true);
+    try {
+      await props.onAccept();
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <div className="relative flex h-[50vh] max-h-[80vh] flex-col overflow-hidden rounded-[28px] bg-white font-sans text-black">
@@ -47,19 +58,32 @@ export default function TermsModal(props: Props) {
       {!isInfo && (
         <div className="flex flex-col gap-4 border-t border-black/10 px-[30px] py-5">
           <label className="flex items-start gap-2 text-[12px] font-normal text-black">
-            <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} className="mt-0.5" />
+            <input
+              type="checkbox"
+              checked={accepted}
+              onChange={(e) => setAccepted(e.target.checked)}
+              disabled={submitting}
+              className="mt-0.5"
+            />
             I have read and accept the Terms &amp; Conditions above.
           </label>
           <div className="flex gap-3">
-            <button onClick={props.onDecline} className="flex-1 rounded-lg bg-black/5 py-3 text-[14px] font-semibold text-black">
+            <button
+              onClick={props.onDecline}
+              disabled={submitting}
+              className="flex-1 rounded-lg bg-black/5 py-3 text-[14px] font-semibold text-black disabled:opacity-50"
+            >
               Decline
             </button>
             <button
-              onClick={props.onAccept}
-              disabled={!accepted}
-              className="flex-1 rounded-lg bg-black/20 py-3 text-[14px] font-semibold text-white enabled:bg-brand-red"
+              onClick={handleAccept}
+              disabled={!accepted || submitting}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-black/20 py-3 text-[14px] font-semibold text-white enabled:bg-brand-red"
             >
-              Accept &amp; Continue
+              {submitting && (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+              )}
+              {submitting ? "Please wait…" : "Accept & Continue"}
             </button>
           </div>
         </div>

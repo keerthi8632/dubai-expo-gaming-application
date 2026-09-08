@@ -16,6 +16,7 @@ import AlphorixForm, { AlphorixSubmission } from "@/components/AlphorixForm";
 import VideoBackground from "@/components/VideoBackground";
 import Modal from "@/components/Modal";
 import TermsModal from "@/components/TermsModal";
+import AlreadyRegisteredModal from "@/components/AlreadyRegisteredModal";
 
 // home: Play Now! + Register, both open the same Alphorix form.
 // gameHome: shown after the form is submitted — Trade Prediction / Spin
@@ -48,6 +49,8 @@ function HomeInner() {
   const existingParticipantId = searchParams.get("participantId");
   const [formOpen, setFormOpen] = useState(false);
   const [termsGame, setTermsGame] = useState<"TRADE" | "SPIN" | null>(null);
+  const [alreadyRegistered, setAlreadyRegistered] = useState(false);
+  const [checkingGame, setCheckingGame] = useState<"TRADE" | "SPIN" | null>(null);
   // Seeded from the /alphorix/thank-you redirect's query params, for the
   // case where that redirect broke out of the iframe to the top level
   // instead of arriving as a postMessage (see the effect below).
@@ -119,6 +122,36 @@ function HomeInner() {
     );
   }
 
+  // Gate on a game button click, before the Terms modal even opens. Skipped
+  // for the "Play Another Game" round trip (existingParticipantId already
+  // set from the URL) — that's the same participant intentionally continuing
+  // to the second game, not a re-registration. Only applies to a fresh
+  // Alphorix form submission this visit, to catch someone re-registering
+  // with an email/phone that already has a Participant row from an earlier
+  // session.
+  async function handleGameClick(game: "TRADE" | "SPIN") {
+    if (existingParticipantId) {
+      setTermsGame(game);
+      return;
+    }
+    setCheckingGame(game);
+    try {
+      const res = await fetch("/api/participant/check-existing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: registration?.email, phone: registration?.phone }),
+      });
+      const data = await res.json().catch(() => ({ exists: false }));
+      if (data.exists) {
+        setAlreadyRegistered(true);
+        return;
+      }
+      setTermsGame(game);
+    } finally {
+      setCheckingGame(null);
+    }
+  }
+
   return (
     <main className="relative h-screen w-screen overflow-hidden">
       <VideoBackground />
@@ -138,8 +171,8 @@ function HomeInner() {
         ) : (
           <div className="mx-auto mt-24 flex w-full max-w-[600px] flex-col items-center gap-5 lg:max-w-[360px] lg:gap-4">
             <button
-              onClick={() => setTermsGame("TRADE")}
-              disabled={playedGames.TRADE}
+              onClick={() => handleGameClick("TRADE")}
+              disabled={playedGames.TRADE || checkingGame !== null}
               className="w-full transition-transform active:scale-95 disabled:active:scale-100"
             >
               <img
@@ -149,8 +182,8 @@ function HomeInner() {
               />
             </button>
             <button
-              onClick={() => setTermsGame("SPIN")}
-              disabled={playedGames.SPIN}
+              onClick={() => handleGameClick("SPIN")}
+              disabled={playedGames.SPIN || checkingGame !== null}
               className="w-full transition-transform active:scale-95 disabled:active:scale-100"
             >
               <img
@@ -215,6 +248,10 @@ function HomeInner() {
         {termsGame && (
           <TermsModal game={termsGame} onAccept={() => enterGame(termsGame)} onDecline={() => setTermsGame(null)} />
         )}
+      </Modal>
+
+      <Modal open={alreadyRegistered} onClose={() => setAlreadyRegistered(false)}>
+        <AlreadyRegisteredModal />
       </Modal>
     </main>
   );

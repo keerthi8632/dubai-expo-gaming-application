@@ -15,7 +15,7 @@ export default function PlayerBadge({ name }: { name: string }) {
         aspectRatio: "1000 / 600",
       }}
     >
-      <span className="font-orbitron text-center text-[28px] font-black text-white">{firstName}</span>
+      <span className="font-orbitron text-center text-[28px] font-black uppercase text-white">{firstName}</span>
     </div>
   );
 }

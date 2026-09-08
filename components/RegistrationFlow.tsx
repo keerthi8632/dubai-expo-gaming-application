@@ -42,7 +42,9 @@ export default function RegistrationFlow({ game, open = true, onClose, onComplet
       {step === "terms" && (
         <TermsModal
           game={game}
-          onAccept={() => participantId && onComplete(participantId, fullName)}
+          onAccept={() => {
+            if (participantId) onComplete(participantId, fullName);
+          }}
           onDecline={handleClose}
         />
       )}
