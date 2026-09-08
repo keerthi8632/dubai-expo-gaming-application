@@ -14,7 +14,7 @@ import { LOGO } from "@/lib/media";
 // - if it ever loads at the top level instead (redirect breaks out of the
 //   iframe), fall back to a normal client-side redirect carrying the same
 //   fields as query params.
-const AUTO_CONTINUE_DELAY_MS = 1500;
+const AUTO_CONTINUE_DELAY_MS = 2500;
 
 export default function ThankYouPage() {
   return (

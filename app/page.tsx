@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -16,7 +16,9 @@ import AlphorixForm, { AlphorixSubmission } from "@/components/AlphorixForm";
 import VideoBackground from "@/components/VideoBackground";
 import Modal from "@/components/Modal";
 import TermsModal from "@/components/TermsModal";
+import TopBar from "@/components/TopBar";
 import AlreadyRegisteredModal from "@/components/AlreadyRegisteredModal";
+import PlayConfirmModal from "@/components/PlayConfirmModal";
 
 // home: Play Now! + Register, both open the same Alphorix form.
 // gameHome: shown after the form is submitted — Trade Prediction / Spin
@@ -51,6 +53,13 @@ function HomeInner() {
   const [termsGame, setTermsGame] = useState<"TRADE" | "SPIN" | null>(null);
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
   const [checkingGame, setCheckingGame] = useState<"TRADE" | "SPIN" | null>(null);
+  // Which button opened the Alphorix form — "Play Now!"/game buttons drop the
+  // player straight into the game picker on submit, but the standalone
+  // "Register" button (home stage footer) shows a play-now-or-later prompt
+  // instead, since that lead may not intend to play at all. A ref (not
+  // state) because it's only read inside submission handlers, never rendered.
+  const [showPlayPrompt, setShowPlayPrompt] = useState(false);
+  const formIntentRef = useRef<"play" | "register">("play");
   // Seeded from the /alphorix/thank-you redirect's query params, for the
   // case where that redirect broke out of the iframe to the top level
   // instead of arriving as a postMessage (see the effect below).
@@ -72,13 +81,26 @@ function HomeInner() {
       if (event.origin !== window.location.origin) return;
       if (!event.data || event.data.type !== "alphorix-thank-you") return;
       const { firstName, lastName, email, phone } = event.data;
-      setRegistration({ firstName, lastName, email, phone });
-      setFormOpen(false);
-      setStage("gameHome");
+      handleRegistered({ firstName, lastName, email, phone });
     }
     window.addEventListener("message", handleThankYouMessage);
     return () => window.removeEventListener("message", handleThankYouMessage);
   }, []);
+
+  function openForm(intent: "play" | "register") {
+    formIntentRef.current = intent;
+    setFormOpen(true);
+  }
+
+  function handleRegistered(info?: AlphorixSubmission) {
+    setRegistration(info);
+    setFormOpen(false);
+    if (formIntentRef.current === "register") {
+      setShowPlayPrompt(true);
+    } else {
+      setStage("gameHome");
+    }
+  }
 
   // Which games this participant has already completed — checked against the
   // DB (not just the single ?played= param) so both buttons disable once
@@ -153,15 +175,21 @@ function HomeInner() {
   }
 
   return (
-    <main className="relative h-screen w-screen overflow-hidden">
+    <main className="relative flex h-screen w-screen flex-col overflow-hidden">
       <VideoBackground />
 
-      <div className="relative z-10 mx-auto flex h-full w-full max-w-[1080px] flex-col items-center px-[64px] py-8">
-        <img src={LOGO} alt="MH Markets" className="h-8" />
+      {stage === "gameHome" && (
+        <div className="relative z-10 shrink-0">
+          <TopBar />
+        </div>
+      )}
+
+      <div className="relative z-10 mx-auto flex w-full max-w-[1080px] flex-1 flex-col items-center px-[64px] py-8">
+        {stage === "home" && <img src={LOGO} alt="MH Markets" className="h-8" />}
 
         {stage === "home" ? (
           <div className="mx-auto mt-24 flex w-full max-w-[600px] flex-col items-center gap-5 lg:max-w-[360px] lg:gap-4">
-            <button onClick={() => setFormOpen(true)} className="w-full transition-transform active:scale-95">
+            <button onClick={() => openForm("play")} className="w-full transition-transform active:scale-95">
               <img src={PLAY_NOW_BUTTON} alt="Play Now!" className="w-full" />
             </button>
             <Link href="/leaderboard" className="mt-2 text-center text-white underline decoration-solid underline-offset-2" style={LEADERBOARD_LINK_STYLE}>
@@ -204,7 +232,7 @@ function HomeInner() {
           <div className="fixed inset-x-0 bottom-0 z-10 flex flex-col items-center gap-[72px] px-[64px] pb-8 desktop:static desktop:z-auto desktop:contents desktop:px-0 desktop:pb-0">
             {stage === "home" && (
               <button
-                onClick={() => setFormOpen(true)}
+                onClick={() => openForm("register")}
                 className="mx-auto flex w-full max-w-[420px] items-center justify-center gap-3 rounded-xl bg-brand-red px-12 py-4 transition-transform active:scale-[0.98] desktop:max-w-[360px] desktop:gap-3 desktop:px-10 desktop:py-4"
               >
                 <span className="text-center text-[28px] font-bold leading-normal tracking-normal text-[#FFFFFF] desktop:text-2xl">
@@ -230,17 +258,10 @@ function HomeInner() {
       >
         <div
           onClick={(e) => e.stopPropagation()}
-          className="no-scrollbar relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white text-black"
+          className="no-scrollbar relative h-[39vh] max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white text-black"
         >
           <CloseButton onClose={() => setFormOpen(false)} />
-          <AlphorixForm
-            formId="57237fa43377"
-            onSubmitted={(info) => {
-              setRegistration(info);
-              setFormOpen(false);
-              setStage("gameHome");
-            }}
-          />
+          <AlphorixForm formId="57237fa43377" onSubmitted={handleRegistered} />
         </div>
       </div>
 
@@ -252,6 +273,19 @@ function HomeInner() {
 
       <Modal open={alreadyRegistered} onClose={() => setAlreadyRegistered(false)}>
         <AlreadyRegisteredModal />
+      </Modal>
+
+      <Modal open={showPlayPrompt} onClose={() => setShowPlayPrompt(false)}>
+        <PlayConfirmModal
+          onPlay={() => {
+            setShowPlayPrompt(false);
+            setStage("gameHome");
+          }}
+          onLater={() => {
+            setShowPlayPrompt(false);
+            setStage("home");
+          }}
+        />
       </Modal>
     </main>
   );
