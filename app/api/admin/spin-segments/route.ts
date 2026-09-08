@@ -16,7 +16,14 @@ export async function PUT(req: NextRequest) {
 
   const parsed = spinSegmentsSchema.safeParse(await req.json());
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    // .flatten() only surfaces root-level issues — these refinements are
+    // nested per array index, so build readable per-row messages instead.
+    const messages = parsed.error.issues.map((issue) => {
+      const rowIndex = issue.path[0];
+      const prefix = typeof rowIndex === "number" ? `Row ${rowIndex + 1}: ` : "";
+      return `${prefix}${issue.message}`;
+    });
+    return NextResponse.json({ error: { formErrors: messages } }, { status: 400 });
   }
 
   await prisma.gameConfig.upsert({

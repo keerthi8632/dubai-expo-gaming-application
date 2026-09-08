@@ -35,13 +35,16 @@ function shuffle<T>(arr: T[]): T[] {
 
 // Builds a day's queue straight from the live segments config, so it always
 // matches whatever prize labels an admin has actually configured — the
-// jackpot segment is only included on its designated day, regardless of its
-// configured dailyQueueCount, since only one jackpot unit exists for the
-// whole event (see spinPrizeLimits.ts).
+// jackpot segment is only included on its designated day, and capped at 1
+// copy regardless of its configured dailyQueueCount, since only one jackpot
+// unit exists for the whole event (see spinPrizeLimits.ts).
 export function buildDefaultQueue(dateKey: string, segments: SpinSegment[]): string[] {
   const flat = segments
     .filter((s) => s.prize && !s.isSpinAgain && (s.prize !== JACKPOT_PRIZE_LABEL || dateKey === JACKPOT_LAST_AVAILABLE_DATE))
-    .flatMap((s) => Array(s.dailyQueueCount ?? 0).fill(s.prize as string));
+    .flatMap((s) => {
+      const count = s.prize === JACKPOT_PRIZE_LABEL ? Math.min(s.dailyQueueCount ?? 0, 1) : s.dailyQueueCount ?? 0;
+      return Array(count).fill(s.prize as string);
+    });
   return shuffle(flat);
 }
 

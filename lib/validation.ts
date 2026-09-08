@@ -55,10 +55,33 @@ export const spinSegmentsSchema = z
         message: "A Spin Again segment can't also have a prize",
         path: ["prize"],
       })
+      // Guards against the label and the actual behavior silently
+      // disagreeing — a segment named "Spin Again" with the checkbox left
+      // unchecked renders the "Spin Again" wedge on the wheel but resolves
+      // as a genuine loss, which is confusing to spot without this check.
+      .refine((s) => s.isSpinAgain || !/spin\s*again/i.test(s.label), {
+        message:
+          "This label reads like a Spin Again segment, but the Spin Again checkbox isn't checked. Check it, or rename the label if it's meant to be a real loss.",
+        path: ["isSpinAgain"],
+      })
   )
   .min(2, "Need at least 2 segments");
 
+// Duplicated (not imported) from lib/spinPrizeLimits.ts's JACKPOT_PRIZE_LABEL
+// — that module pulls in the Prisma client, and this file is imported by the
+// client component RegisterModal.tsx, so importing it here would leak
+// Prisma into the browser bundle.
+const JACKPOT_PRIZE_LABEL = "USD 1,000 Funded Account";
+
 export const spinQueueSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
-  queue: z.array(z.string().min(1).max(80)).min(1, "Queue can't be empty"),
+  queue: z
+    .array(z.string().min(1).max(80))
+    .min(1, "Queue can't be empty")
+    // Only one physical jackpot unit exists for the whole event — a queue
+    // can never schedule it more than once, regardless of how it got added
+    // (manual "+ Add to Queue" clicks, a misconfigured Daily Qty, etc).
+    .refine((queue) => queue.filter((p) => p === JACKPOT_PRIZE_LABEL).length <= 1, {
+      message: "The Grand Prize / Jackpot can only appear once in the queue — it's a single prize for the whole event.",
+    }),
 });

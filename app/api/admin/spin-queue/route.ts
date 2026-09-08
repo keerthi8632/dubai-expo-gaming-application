@@ -37,7 +37,11 @@ export async function PUT(req: NextRequest) {
 
   const parsed = spinQueueSchema.safeParse(await req.json());
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    // .flatten() puts field-level refinements (e.g. on `queue`) under
+    // fieldErrors, not formErrors, so build a readable message list directly
+    // from the issues instead of relying on it.
+    const messages = parsed.error.issues.map((issue) => issue.message);
+    return NextResponse.json({ error: { formErrors: messages } }, { status: 400 });
   }
 
   await saveSpinQueue(parsed.data.date, parsed.data.queue);

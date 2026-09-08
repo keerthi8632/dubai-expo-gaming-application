@@ -11,10 +11,12 @@ type SpinSegment = {
 };
 type SpinEventWindow = { startHour: number; startMinute: number; endHour: number; endMinute: number };
 
-// Must match JACKPOT_LAST_AVAILABLE_DATE in lib/spinPrizeLimits.ts — kept as a
-// plain string here (rather than importing that server-only module) so this
-// client component doesn't pull Prisma into the browser bundle.
-const JACKPOT_DAY = "2026-09-23";
+// Must match JACKPOT_LAST_AVAILABLE_DATE / JACKPOT_PRIZE_LABEL in
+// lib/spinPrizeLimits.ts — kept as plain strings here (rather than importing
+// that server-only module) so this client component doesn't pull Prisma into
+// the browser bundle.
+const JACKPOT_DAY = "2026-09-22";
+const JACKPOT_PRIZE_LABEL = "USD 1,000 Funded Account";
 
 function todayKey() {
   const d = new Date();
@@ -98,6 +100,9 @@ export default function ConfigPage() {
 
   function addQueueItem() {
     if (!addPrize) return;
+    // Only one physical jackpot unit exists for the whole event — never let
+    // the queue end up with it twice, whatever the day already contains.
+    if (addPrize === JACKPOT_PRIZE_LABEL && queue.includes(JACKPOT_PRIZE_LABEL)) return;
     setQueue((prev) => [...prev, addPrize]);
   }
 
@@ -140,7 +145,7 @@ export default function ConfigPage() {
         body: JSON.stringify({ date: queueDate, queue }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.formErrors?.[0] ?? "Could not save queue");
+      if (!res.ok) throw new Error(data.error?.formErrors?.join(" ") ?? "Could not save queue");
       setQueueSaved(true);
       await loadQueue(queueDate); // refresh remaining/total counts against the newly saved queue
     } catch (err: any) {
@@ -210,7 +215,7 @@ export default function ConfigPage() {
         body: JSON.stringify(segments),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.formErrors?.[0] ?? "Could not save segments");
+      if (!res.ok) throw new Error(data.error?.formErrors?.join(" ") ?? "Could not save segments");
       setSegments(data.segments);
       setSegmentsSaved(true);
     } catch (err: any) {
@@ -311,10 +316,20 @@ export default function ConfigPage() {
                     <input
                       type="number"
                       min={0}
+                      max={seg.prize === JACKPOT_PRIZE_LABEL ? 1 : undefined}
                       value={seg.dailyQueueCount ?? 0}
-                      onChange={(e) => updateSegment(i, { dailyQueueCount: Math.max(0, Number(e.target.value) || 0) })}
+                      onChange={(e) => {
+                        const cap = seg.prize === JACKPOT_PRIZE_LABEL ? 1 : Infinity;
+                        updateSegment(i, { dailyQueueCount: Math.min(cap, Math.max(0, Number(e.target.value) || 0)) });
+                      }}
                       disabled={seg.isSpinAgain || !seg.prize}
-                      title={seg.isSpinAgain || !seg.prize ? "Only applies to prize segments" : undefined}
+                      title={
+                        seg.isSpinAgain || !seg.prize
+                          ? "Only applies to prize segments"
+                          : seg.prize === JACKPOT_PRIZE_LABEL
+                            ? "Only one jackpot unit exists for the whole event"
+                            : undefined
+                      }
                       className="w-20 rounded border px-2 py-1 disabled:bg-black/5 disabled:text-black/30"
                     />
                   </td>
@@ -342,6 +357,14 @@ export default function ConfigPage() {
           <p className="mt-3 text-xs text-amber-600">
             ⚠ Odd number of segments ({segments.length}). The wheel alternates red/white, so an odd count makes two
             segments of the same color end up next to each other. Add or remove one to keep it even.
+          </p>
+        )}
+
+        {segments.some((s) => !s.isSpinAgain && /spin\s*again/i.test(s.label)) && (
+          <p className="mt-3 text-xs text-amber-600">
+            ⚠ A segment is labeled "Spin Again" but its Spin Again checkbox isn't ticked — it will render the Spin
+            Again wedge on the wheel but resolve as a real loss. Check the box, or rename the label. Saving is
+            blocked until this is fixed.
           </p>
         )}
 
@@ -427,6 +450,13 @@ export default function ConfigPage() {
           </p>
         )}
 
+        {queue.filter((p) => p === JACKPOT_PRIZE_LABEL).length > 1 && (
+          <p className="mt-3 text-xs font-medium text-red-600">
+            ⚠ This queue has the Grand Prize / Jackpot listed more than once — only one unit exists for the whole
+            event. Remove the extra entry below before saving; saving is blocked until only one remains.
+          </p>
+        )}
+
         <div className="mt-4 rounded-lg bg-black/[0.03] p-3">
           <p className="text-xs font-semibold uppercase text-black/50">Prizes left today</p>
           <ul className="mt-2 space-y-1 text-sm">
@@ -479,7 +509,16 @@ export default function ConfigPage() {
               </option>
             ))}
           </select>
-          <button onClick={addQueueItem} disabled={!addPrize} className="rounded-lg bg-black/10 px-3 py-1.5 text-xs font-semibold disabled:opacity-40">
+          <button
+            onClick={addQueueItem}
+            disabled={!addPrize || (addPrize === JACKPOT_PRIZE_LABEL && queue.includes(JACKPOT_PRIZE_LABEL))}
+            title={
+              addPrize === JACKPOT_PRIZE_LABEL && queue.includes(JACKPOT_PRIZE_LABEL)
+                ? "The jackpot is already in this queue — only one unit exists for the whole event"
+                : undefined
+            }
+            className="rounded-lg bg-black/10 px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
+          >
             + Add to Queue
           </button>
           <button onClick={shuffleQueue} disabled={queue.length === 0} className="rounded-lg bg-black/10 px-3 py-1.5 text-xs font-semibold disabled:opacity-40">
