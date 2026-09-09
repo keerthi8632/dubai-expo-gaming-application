@@ -89,6 +89,13 @@ function HomeInner() {
 
   function openForm(intent: "play" | "register") {
     formIntentRef.current = intent;
+    // Dev-only escape hatch — skips the real Alphorix iframe so local testing
+    // doesn't require submitting the live form each time. Must stay off in
+    // production, where this is the only place lead data gets captured.
+    if (process.env.NEXT_PUBLIC_SKIP_ALPHORIX_FORM === "1") {
+      handleRegistered(undefined);
+      return;
+    }
     setFormOpen(true);
   }
 
