@@ -15,7 +15,7 @@ type SpinEventWindow = { startHour: number; startMinute: number; endHour: number
 // lib/spinPrizeLimits.ts — kept as plain strings here (rather than importing
 // that server-only module) so this client component doesn't pull Prisma into
 // the browser bundle.
-const JACKPOT_DAY = "2026-09-22";
+const JACKPOT_DAY = "2026-09-23";
 const JACKPOT_PRIZE_LABEL = "USD 1,000 Funded Account";
 
 function todayKey() {

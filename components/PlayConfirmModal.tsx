@@ -24,20 +24,20 @@ export default function PlayConfirmModal({ onPlay, onLater }: { onPlay: () => vo
         You're in!
       </h2>
 
-      <p className="text-[15px] font-semibold text-white">Registration complete. Want to play a game now?</p>
+      <p className="text-[15px] font-semibold text-white">Registration complete. Want to play now?</p>
 
       <div className="mt-3 flex w-full gap-3">
         <button
           onClick={onLater}
           className="flex-1 rounded-[14px] border border-white/20 bg-white/5 py-3 text-[14px] font-black uppercase text-white transition-transform active:scale-95"
         >
-          Cancel
+          Skip
         </button>
         <button
           onClick={onPlay}
           className="flex-1 rounded-[14px] bg-brand-red py-3 text-[14px] font-black uppercase text-white shadow-[0_0_20px_rgba(179,18,23,0.7)] transition-transform active:scale-95"
         >
-          Play Now
+          Play
         </button>
       </div>
     </motion.div>
