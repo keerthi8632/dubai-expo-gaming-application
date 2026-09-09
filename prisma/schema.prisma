@@ -1,0 +1,132 @@
+// Prisma schema for MH Markets Expo Game
+// Run `npx prisma migrate dev --name init` after setting DATABASE_URL in .env
+//
+// SQLite doesn't support native `enum` or `Json` column types, so fields that
+// would otherwise be enums are plain String columns (validated at the
+// application layer via lib/validation.ts and TypeScript unions instead of
+// the database), and Json fields are stored as serialized text — see
+// lib/json.ts for the read/write helpers.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// GameType: "TRADE" | "SPIN"
+// ForcedOutcome: "WIN" | "LOSE" | null
+// SessionStatus: "NOT_PLAYED" | "WON" | "LOST"
+// Language: "ENGLISH" | "ARABIC"
+
+model Participant {
+  id              String   @id @default(cuid())
+  fullName        String
+  email           String
+  phone           String
+  countryCode     String   // dial code, e.g. "+971"
+  countryOfResidence String
+  doesTrade       Boolean?
+  language        String   @default("ENGLISH")
+
+  // Which booth game the registration form was opened for — "TRADE" | "SPIN".
+  // Kept separate from GameSession.gameType since a session is only created
+  // once the participant actually plays, but we want to report/filter on
+  // registrations regardless of whether they went on to play.
+  registeredGame  String?
+
+  emailVerified   Boolean  @default(false)
+  phoneVerified   Boolean  @default(false)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  otpCodes        OtpCode[]
+  gameSessions    GameSession[]
+
+  // one participant should not be able to register twice with the same email
+  @@unique([email])
+  @@index([phone])
+}
+
+model OtpCode {
+  id              String   @id @default(cuid())
+  participantId   String
+  participant     Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  channel         String   // "email" or "sms"
+  code            String
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  attempts        Int      @default(0)
+
+  createdAt       DateTime @default(now())
+
+  @@index([participantId, channel])
+}
+
+model GameSession {
+  id              String        @id @default(cuid())
+  participantId   String
+  participant     Participant   @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  gameType        String        // "TRADE" | "SPIN"
+  status          String        @default("NOT_PLAYED") // "NOT_PLAYED" | "WON" | "LOST"
+
+  // Set by an admin ahead of time to guarantee the outcome.
+  // If null, the game engine decides (default win-rate applies).
+  forcedOutcome   String?       // "WIN" | "LOSE" | null
+  forcedByAdminId String?
+  forcedAt        DateTime?
+
+  // Game-specific result snapshot (entry/exit price or wheel segment landed on),
+  // stored as a JSON string — see lib/json.ts for parse/stringify helpers.
+  resultDetail    String?
+
+  // Prize claim tracking (trade game "claim code" screen, spin wheel prize tiers)
+  prizeLabel      String?
+  claimCode       String?       @unique
+  claimedAt       DateTime?
+
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime      @default(now())
+
+  // enforces "one chance per game" at the database level
+  @@unique([participantId, gameType])
+  @@index([gameType, status])
+}
+
+// Records which participant claimed a given day's queue window (see
+// lib/spinQueue.ts) — the unique constraint is what makes "first spin in
+// the window wins" atomic even if two spins land in the same window at
+// nearly the same instant.
+model SpinQueueClaim {
+  id            String   @id @default(cuid())
+  date          String   // event-day key, "YYYY-MM-DD" local time
+  windowIndex   Int
+  prizeLabel    String
+  participantId String
+  claimedAt     DateTime @default(now())
+
+  @@unique([date, windowIndex])
+}
+
+model Admin {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  role          String   @default("admin") // "admin" | "superadmin"
+  createdAt     DateTime @default(now())
+}
+
+// Global settings an admin can tune without redeploying,
+// e.g. default win rate when no forced outcome is set, or active spin wheel segments
+model GameConfig {
+  id            String   @id @default(cuid())
+  key           String   @unique // "trade_default_win_rate" | "report_recipients" | ...
+  value         String   // JSON string — see lib/json.ts
+  updatedAt     DateTime @updatedAt
+}

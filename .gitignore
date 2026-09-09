@@ -1,0 +1,41 @@
+# dependencies
+/node_modules
+
+# next.js build output
+/.next/
+/out/
+/build
+
+# testing/coverage
+/coverage
+
+# env files (never commit secrets)
+.env
+.env*.local
+
+# dev.db is intentionally committed and shared between dev and the nginx
+# server (single source of truth) — only the transient SQLite WAL/journal
+# sidecar files are ignored.
+/prisma/*.db-journal
+/prisma/*.db-wal
+/prisma/*.db-shm
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# editor/OS junk
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# vercel
+.vercel

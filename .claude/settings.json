@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p app/thank-you)",
+      "Bash(git mv *)",
+      "Bash(rmdir app/alphorix/thank-you)",
+      "Bash(rmdir app/alphorix)",
+      "Bash(cd \"c:\\\\Users\\\\MHDB240-Keerthi\\\\Desktop\\\\Project\\\\mh-markets-expo\" && rm -rf .next && npx tsc --noEmit -p . 2>&1 | head -60)"
+    ]
+  }
+}
