@@ -65,7 +65,7 @@ export default function TermsModal(props: Props) {
               disabled={submitting}
               className="mt-0.5"
             />
-            I have read and accept the Terms &amp; Conditions above.
+            I have read the Terms &amp; Conditions above.
           </label>
           <div className="flex gap-3">
             <button
