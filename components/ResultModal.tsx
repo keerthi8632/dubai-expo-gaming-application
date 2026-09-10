@@ -6,6 +6,7 @@ import { ReactNode } from "react";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { CONFETTI_LOTTIE } from "@/lib/media";
 import { FUNDED_ACCOUNT_TERMS } from "@/lib/termsCopy";
+import { playWinChime } from "@/lib/winChime";
 import Modal from "./Modal";
 import TermsModal from "./TermsModal";
 
@@ -58,6 +59,11 @@ export default function ResultModal({
     const t = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
     return () => clearTimeout(t);
   }, [secondsLeft, router, termsOpen]);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once on mount, not on every re-render
+  useEffect(() => {
+    if (won) playWinChime();
+  }, []);
 
   return (
     <div className="-translate-y-[50%] flex w-[500px] max-w-[400px] flex-col items-center gap-2 overflow-hidden rounded-[28px] bg-white">
