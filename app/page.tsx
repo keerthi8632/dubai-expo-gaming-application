@@ -71,6 +71,28 @@ function HomeInner() {
     return firstName || lastName || email || phone ? { firstName, lastName, email, phone } : undefined;
   });
 
+  // TopBar's Home/Quit buttons (and anything else) navigate here via
+  // router.push("/") — since that's the same route this component is
+  // already mounted on, Next does a soft navigation instead of remounting,
+  // so `stage` (only ever seeded from the URL once, above) would otherwise
+  // never notice the params disappeared. Keep it in sync on every URL change.
+  useEffect(() => {
+    const nextStage = searchParams.get("stage") === "gameHome" ? "gameHome" : "home";
+    setStage(nextStage);
+    // Landing back on plain "/" only happens via Home/Quit from the game
+    // picker (the thank-you redirect's fallback always carries stage=
+    // gameHome, so it never hits this branch) — treat it as a full reset
+    // back to a clean first-visit state, not just a stage switch.
+    if (nextStage === "home") {
+      setRegistration(undefined);
+      setTermsGame(null);
+      setAlreadyRegistered(false);
+      setCheckingGame(null);
+      setShowPlayPrompt(false);
+      setPlayedGames({ TRADE: false, SPIN: false });
+    }
+  }, [searchParams]);
+
   // Alphorix's Thank-you URL redirect lands on /alphorix/thank-you, which
   // postMessages the lead's fields back here if it loaded inside the
   // AlphorixForm iframe below — this is the reliable path (the AlphorixForm
@@ -181,13 +203,29 @@ function HomeInner() {
     }
   }
 
+  // Home/Quit on the game-picker screen — reset state directly rather than
+  // via router.push("/"), since this stage can be reached from local state
+  // alone (a fresh Alphorix submit never touches the URL), leaving the URL
+  // already at "/": pushing "/" again is then a same-URL no-op that Next
+  // won't re-render for, so the buttons would otherwise do nothing.
+  function resetToHome() {
+    setStage("home");
+    setRegistration(undefined);
+    setTermsGame(null);
+    setAlreadyRegistered(false);
+    setCheckingGame(null);
+    setShowPlayPrompt(false);
+    setPlayedGames({ TRADE: false, SPIN: false });
+    router.replace("/");
+  }
+
   return (
     <main className="relative flex h-screen w-screen flex-col overflow-hidden">
       <VideoBackground />
 
       {stage === "gameHome" && (
         <div className="relative z-10 shrink-0">
-          <TopBar />
+          <TopBar onHome={resetToHome} onQuit={resetToHome} />
         </div>
       )}
 
@@ -265,7 +303,7 @@ function HomeInner() {
       >
         <div
           onClick={(e) => e.stopPropagation()}
-          className="no-scrollbar relative h-[39vh] max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white text-black"
+          className="no-scrollbar relative h-[49vh] max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white text-black"
         >
           <CloseButton onClose={() => setFormOpen(false)} />
           <AlphorixForm formId="57237fa43377" onSubmitted={handleRegistered} />

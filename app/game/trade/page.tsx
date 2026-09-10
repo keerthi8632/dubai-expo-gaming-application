@@ -237,7 +237,7 @@ function TradeGameInner() {
   return (
     <main className="flex min-h-screen flex-col overflow-y-auto">
       <VideoBackground />
-      <TopBar />
+      <TopBar homeHref={`/?stage=gameHome${participantId ? `&participantId=${participantId}` : ""}`} />
       <div className="mt-2">
         <PlayerBadge name={name} />
       </div>
