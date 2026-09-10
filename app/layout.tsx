@@ -3,6 +3,7 @@ import { Inter, Orbitron, Space_Grotesk } from "next/font/google";
 import "flag-icons/css/flag-icons.min.css";
 import "./globals.css";
 import KioskGuard from "@/components/KioskGuard";
+import VersionLog from "@/components/VersionLog";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const orbitron = Orbitron({ subsets: ["latin"], variable: "--font-orbitron" });
@@ -21,7 +22,6 @@ export const viewport: Viewport = {
   userScalable: false,
   viewportFit: "cover",
 };
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${inter.variable} ${orbitron.variable} ${spaceGrotesk.variable}`}>
@@ -29,6 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://alphorix.net" />
       </head>
       <body className="bg-brand-black text-white min-h-screen font-sans">
+        <VersionLog />
         <KioskGuard />
         {children}
       </body>

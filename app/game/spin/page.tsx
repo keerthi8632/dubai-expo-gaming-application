@@ -194,7 +194,7 @@ function SpinGameInner() {
     <main className="flex min-h-screen h-[100dvh] flex-col items-center overflow-y-auto overflow-x-hidden">
       <VideoBackground />
       <div className="w-full">
-        <TopBar />
+        <TopBar homeHref={`/?stage=gameHome${participantId ? `&participantId=${participantId}` : ""}`} />
       </div>
       <div className="mt-2">
         <PlayerBadge name={name} />
