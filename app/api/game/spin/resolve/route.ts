@@ -6,6 +6,7 @@ import { pickSegmentIndex, pickWeightedIndex } from "@/lib/spinSegments";
 import { getSpinSegments } from "@/lib/spinConfig";
 import { getSpinPrizeLimits, getWonPrizeCounts, JACKPOT_PRIZE_LABEL, isJackpotExpired } from "@/lib/spinPrizeLimits";
 import { getOtherGameSession, getLastSpinWinAt } from "@/lib/gameSessions";
+import { venueStartOfDay } from "@/lib/venueTime";
 import {
   localDateKey,
   getSpinEventWindow,
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
   // the moment play resumes — enforce a minimum gap since the last win today,
   // regardless of how many prizes are queued up. An admin's forced WIN is a
   // deliberate override and still bypasses this, same as everywhere else.
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfToday = venueStartOfDay(now);
   const [minWinGapMinutes, lastWinAt] = await Promise.all([
     getSpinMinWinGapMinutes(),
     getLastSpinWinAt(startOfToday),
@@ -124,6 +125,22 @@ export async function POST(req: NextRequest) {
     if (forcedOutcome === "WIN" && !alreadyWonOtherGame) {
       // Admin override still wins even outside the scheduled queue.
       segmentIndex = pickSegmentIndex(segments, "WIN", excludedIndices);
+      const wonPrize = segments[segmentIndex].prize;
+      if (wonPrize) {
+        // This win didn't come through the due-window walk above, so it
+        // never touched the queue — without this, it's a real prize handed
+        // out that the admin's "Prizes left today" count (which is driven
+        // entirely by SpinQueueClaim rows) would never reflect. Attribute it
+        // to whichever of today's scheduled slots for this prize is still
+        // open, if any, so the count stays accurate.
+        const dateKey = localDateKey(now);
+        const queue = await getSpinQueue(dateKey, segments);
+        const claimed = await getClaimedWindowIndices(dateKey, queue.length - 1);
+        const availableIndex = queue.findIndex((p, idx) => p === wonPrize && !claimed.has(idx));
+        if (availableIndex !== -1) {
+          await claimQueueSlot(dateKey, availableIndex, wonPrize, participantId);
+        }
+      }
     } else {
       // No prize due this spin — the day's prize budget is governed entirely
       // by the queue above, so anything outside it can only land on Spin

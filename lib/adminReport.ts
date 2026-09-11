@@ -1,12 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { resend, RESEND_FROM } from "./resend";
-
-function startOfToday(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
+import { venueStartOfDay } from "./venueTime";
 
 export type GameTypeFilter = "TRADE" | "SPIN" | undefined;
 
@@ -37,7 +32,7 @@ function fetchSessions(where?: Prisma.GameSessionWhereInput) {
 }
 
 export async function sendDailyReport(recipients: string[], gameType?: GameTypeFilter) {
-  const since = startOfToday();
+  const since = venueStartOfDay();
 
   const [participants, sessions] = await Promise.all([
     prisma.participant.findMany({

@@ -9,6 +9,7 @@ import { prisma } from "./prisma";
 import { fromJson, toJson } from "./json";
 import { JACKPOT_PRIZE_LABEL, JACKPOT_LAST_AVAILABLE_DATE } from "./spinPrizeLimits";
 import { SpinSegment } from "./spinSegments";
+import { venueDateKey, venueMinutesOfDay } from "./venueTime";
 
 export const SPIN_EVENT_WINDOW_CONFIG_KEY = "spin_event_window";
 export const SPIN_QUEUE_CONFIG_KEY_PREFIX = "spin_queue:";
@@ -17,11 +18,12 @@ export type SpinEventWindow = { startHour: number; startMinute: number; endHour:
 
 export const DEFAULT_SPIN_EVENT_WINDOW: SpinEventWindow = { startHour: 10, startMinute: 0, endHour: 18, endMinute: 0 };
 
+// Kept as a thin wrapper (rather than renaming every call site) — computes
+// the calendar date in the venue's timezone (Asia/Dubai), not the host
+// server's own local time, since the two can differ once this runs on a
+// remote host instead of an on-site kiosk. See lib/venueTime.ts.
 export function localDateKey(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return venueDateKey(d);
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -118,15 +120,14 @@ export async function saveSpinQueue(dateKey: string, queue: string[]): Promise<v
 // see getNextDueQueueIndex for which slot is actually still unclaimed.
 export function getOpenWindowIndex(now: Date, window: SpinEventWindow, queueLength: number): number | null {
   if (queueLength === 0) return null;
-  const start = new Date(now);
-  start.setHours(window.startHour, window.startMinute, 0, 0);
-  const end = new Date(now);
-  end.setHours(window.endHour, window.endMinute, 0, 0);
-  if (now < start || now >= end) return null;
+  const startMinutes = window.startHour * 60 + window.startMinute;
+  const endMinutes = window.endHour * 60 + window.endMinute;
+  const nowMinutes = venueMinutesOfDay(now);
+  if (nowMinutes < startMinutes || nowMinutes >= endMinutes) return null;
 
-  const totalMinutes = (end.getTime() - start.getTime()) / 60000;
+  const totalMinutes = endMinutes - startMinutes;
   const windowMinutes = totalMinutes / queueLength;
-  const elapsedMinutes = (now.getTime() - start.getTime()) / 60000;
+  const elapsedMinutes = nowMinutes - startMinutes;
   const index = Math.floor(elapsedMinutes / windowMinutes);
   return Math.min(index, queueLength - 1);
 }
