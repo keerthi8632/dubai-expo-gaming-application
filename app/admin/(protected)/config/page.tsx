@@ -49,6 +49,12 @@ export default function ConfigPage() {
   const [queueError, setQueueError] = useState<string | null>(null);
   const [remainingCounts, setRemainingCounts] = useState<Record<string, number>>({});
   const [totalCounts, setTotalCounts] = useState<Record<string, number>>({});
+  const [queueRefreshing, setQueueRefreshing] = useState(false);
+  // Which queue positions are already won/forfeited today — the queue array
+  // itself must stay index-stable (windowIndex math + existing claims key
+  // off position), so instead of splicing these out we just hide them from
+  // the admin's list, which shows only what's still actually up for grabs.
+  const [claimedIndices, setClaimedIndices] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     load();
@@ -56,6 +62,15 @@ export default function ConfigPage() {
 
   useEffect(() => {
     loadQueue(queueDate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queueDate]);
+
+  // Keeps "Prizes left today" honest while the page is left open across
+  // spins, without the admin having to change the date or re-save to see
+  // claims that happened elsewhere.
+  useEffect(() => {
+    const id = setInterval(() => loadQueue(queueDate), 15000);
+    return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queueDate]);
 
@@ -77,12 +92,18 @@ export default function ConfigPage() {
 
   async function loadQueue(date: string) {
     setQueueError(null);
-    const res = await fetch(`/api/admin/spin-queue?date=${date}`);
-    const data = await res.json();
-    if (Array.isArray(data.queue)) setQueue(data.queue);
-    if (data.eventWindow) setEventWindow(data.eventWindow);
-    setTotalCounts(data.totalCounts ?? {});
-    setRemainingCounts(data.remainingCounts ?? {});
+    setQueueRefreshing(true);
+    try {
+      const res = await fetch(`/api/admin/spin-queue?date=${date}`);
+      const data = await res.json();
+      if (Array.isArray(data.queue)) setQueue(data.queue);
+      if (data.eventWindow) setEventWindow(data.eventWindow);
+      setTotalCounts(data.totalCounts ?? {});
+      setRemainingCounts(data.remainingCounts ?? {});
+      setClaimedIndices(new Set(Array.isArray(data.claimedIndices) ? data.claimedIndices : []));
+    } finally {
+      setQueueRefreshing(false);
+    }
   }
 
   function moveQueueItem(from: number, to: number) {
@@ -255,9 +276,11 @@ export default function ConfigPage() {
         <p className="mt-1 text-xs text-black/50">
           Add, remove, or edit wheel segments. Leave <strong>Prize</strong> empty to make it a losing segment, or check{" "}
           <strong>Spin Again</strong> to give the participant another spin instead (no prize, no win or loss recorded).
-          Weight controls how likely a segment is relative to the others (higher = more likely) when the outcome isn't
-          forced. <strong>Daily Qty</strong> is how many of that prize go into each day's scheduled queue (see Prize
-          Queue below) — spins outside the queue's scheduled windows can never win a prize, only Spin Again or lose.
+          <strong>Daily Qty</strong> is how many of that prize go into each day's scheduled queue (see Prize Queue
+          below) — spins outside the queue's scheduled windows can never win a prize, only Spin Again or lose.{" "}
+          <strong>Weight</strong> no longer affects which prize is won — that's fully decided by the queue — so it's
+          only editable on Spin Again / lose rows now, to balance how often a non-winning spin lands on "Spin Again"
+          vs. "Not This Time".
         </p>
 
         <div className="mt-4 overflow-x-auto">
@@ -309,7 +332,13 @@ export default function ConfigPage() {
                       min={1}
                       value={seg.weight}
                       onChange={(e) => updateSegment(i, { weight: Number(e.target.value) || 1 })}
-                      className="w-20 rounded border px-2 py-1"
+                      disabled={!seg.isSpinAgain && !!seg.prize}
+                      title={
+                        !seg.isSpinAgain && !!seg.prize
+                          ? "Prizes are now awarded by the scheduled queue, not weight — this only still matters for Spin Again vs. losing odds"
+                          : undefined
+                      }
+                      className="w-20 rounded border px-2 py-1 disabled:bg-black/5 disabled:text-black/30"
                     />
                   </td>
                   <td className="py-2 pr-3">
@@ -458,7 +487,16 @@ export default function ConfigPage() {
         )}
 
         <div className="mt-4 rounded-lg bg-black/[0.03] p-3">
-          <p className="text-xs font-semibold uppercase text-black/50">Prizes left today</p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase text-black/50">Prizes left today</p>
+            <button
+              onClick={() => loadQueue(queueDate)}
+              disabled={queueRefreshing}
+              className="rounded bg-black/10 px-2 py-1 text-xs font-semibold disabled:opacity-50"
+            >
+              {queueRefreshing ? "Refreshing…" : "↻ Refresh"}
+            </button>
+          </div>
           <ul className="mt-2 space-y-1 text-sm">
             {Object.keys(totalCounts).length === 0 && <li className="text-black/40">No prizes scheduled for this day.</li>}
             {Object.entries(totalCounts).map(([prize, total]) => (
@@ -472,28 +510,37 @@ export default function ConfigPage() {
           </ul>
         </div>
 
-        <ul className="mt-4 space-y-1.5">
-          {queue.map((prize, i) => (
-            <li
-              key={i}
-              draggable
-              onDragStart={() => setDragIndex(i)}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => {
-                if (dragIndex !== null && dragIndex !== i) moveQueueItem(dragIndex, i);
-                setDragIndex(null);
-              }}
-              className="flex cursor-grab items-center gap-3 rounded-lg border bg-black/[0.02] px-3 py-2 text-sm active:cursor-grabbing"
-            >
-              <span className="text-black/30">⠿</span>
-              <span className="w-8 text-xs text-black/40">#{i + 1}</span>
-              <span className="flex-1">{prize}</span>
-              <button onClick={() => removeQueueItem(i)} className="rounded bg-black/10 px-2 py-1 text-xs">
-                Remove
-              </button>
-            </li>
-          ))}
+        <p className="mt-4 text-xs text-black/40">
+          Already-won/forfeited slots are hidden below — this list is just what's still left to give away today.
+          {claimedIndices.size > 0 && ` (${claimedIndices.size} claimed slot${claimedIndices.size === 1 ? "" : "s"} hidden.)`}
+        </p>
+        <ul className="mt-2 space-y-1.5">
+          {queue.map((prize, i) =>
+            claimedIndices.has(i) ? null : (
+              <li
+                key={i}
+                draggable
+                onDragStart={() => setDragIndex(i)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => {
+                  if (dragIndex !== null && dragIndex !== i) moveQueueItem(dragIndex, i);
+                  setDragIndex(null);
+                }}
+                className="flex cursor-grab items-center gap-3 rounded-lg border bg-black/[0.02] px-3 py-2 text-sm active:cursor-grabbing"
+              >
+                <span className="text-black/30">⠿</span>
+                <span className="w-8 text-xs text-black/40">#{i + 1}</span>
+                <span className="flex-1">{prize}</span>
+                <button onClick={() => removeQueueItem(i)} className="rounded bg-black/10 px-2 py-1 text-xs">
+                  Remove
+                </button>
+              </li>
+            )
+          )}
           {queue.length === 0 && <p className="text-sm text-black/40">Queue is empty.</p>}
+          {queue.length > 0 && queue.length === claimedIndices.size && (
+            <p className="text-sm text-black/40">All of today's queued prizes have been won.</p>
+          )}
         </ul>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
