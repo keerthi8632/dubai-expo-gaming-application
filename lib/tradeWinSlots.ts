@@ -1,7 +1,10 @@
 // Caps natural (non-forced) Trade Prediction wins to at most one per time
 // slot, so the day can produce at most 5 winners total. Slot boundaries are
-// evaluated in the server's local time (the kiosk device's own clock), which
-// matches the venue's on-site time.
+// evaluated in the venue's timezone (Asia/Dubai) explicitly, not the host
+// server's own local clock — the app may run on a remote host whose system
+// time isn't Dubai time. See lib/venueTime.ts.
+import { venueMinutesOfDay, venueStartOfDay } from "./venueTime";
+
 export const TRADE_WIN_SLOTS = [
   { startMinutes: 10 * 60 + 30, endMinutes: 11 * 60 + 30 }, // 10:30–11:30
   { startMinutes: 11 * 60 + 30, endMinutes: 13 * 60 }, // 11:30–1:00 PM
@@ -11,13 +14,12 @@ export const TRADE_WIN_SLOTS = [
 ];
 
 export function slotForDate(date: Date): { startMinutes: number; endMinutes: number } | null {
-  const minutesOfDay = date.getHours() * 60 + date.getMinutes();
+  const minutesOfDay = venueMinutesOfDay(date);
   return TRADE_WIN_SLOTS.find((s) => minutesOfDay >= s.startMinutes && minutesOfDay < s.endMinutes) ?? null;
 }
 
-export function startOfDay(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-}
+// Re-exported for existing call sites (e.g. app/api/leaderboard/route.ts).
+export const startOfDay = venueStartOfDay;
 
 function slotToDateRange(slot: { startMinutes: number; endMinutes: number }, day: Date) {
   const base = startOfDay(day);

@@ -23,12 +23,6 @@ const GAME_ICON: Record<Winner["gameType"], string> = {
   SPIN: "🎡",
 };
 
-const RANK_STYLE: Record<number, { medal: string; ring: string; glow: string }> = {
-  1: { medal: "🥇", ring: "ring-2 ring-[#FFD700]/70", glow: "shadow-[0_0_28px_-4px_rgba(255,215,0,0.55)]" },
-  2: { medal: "🥈", ring: "ring-2 ring-[#C0C0C0]/60", glow: "shadow-[0_0_22px_-6px_rgba(192,192,192,0.4)]" },
-  3: { medal: "🥉", ring: "ring-2 ring-[#CD7F32]/60", glow: "shadow-[0_0_22px_-6px_rgba(205,127,50,0.4)]" },
-};
-
 const POLL_MS = 60000;
 
 function isJackpot(prizeLabel: string | null): boolean {
@@ -94,7 +88,6 @@ export default function LeaderboardPage() {
             <AnimatePresence initial={false}>
               {ordered.map((w, i) => {
                 const rank = i + 1;
-                const style = RANK_STYLE[rank];
                 const jackpot = isJackpot(w.prizeLabel);
                 return (
                   <motion.li
@@ -107,10 +100,10 @@ export default function LeaderboardPage() {
                       jackpot
                         ? "border-[#FFD700]/50 bg-gradient-to-r from-[#3a2a05]/70 via-[#B31217]/30 to-[#3a2a05]/70"
                         : "border-white/10 bg-white/[0.07]"
-                    } ${style?.ring ?? ""} ${style?.glow ?? ""}`}
+                    }`}
                   >
                     <span className="font-orbitron w-10 shrink-0 text-center text-2xl font-black text-white/80">
-                      {style?.medal ?? rank}
+                      {rank}
                     </span>
 
                     <span className="text-2xl shrink-0">{GAME_ICON[w.gameType]}</span>

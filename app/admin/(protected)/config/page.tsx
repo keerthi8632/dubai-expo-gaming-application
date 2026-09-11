@@ -397,6 +397,13 @@ export default function ConfigPage() {
           </p>
         )}
 
+        {segments.some((s) => !s.isSpinAgain && s.prize && s.prize.trim().toLowerCase() === s.label.trim().toLowerCase() && /not\s*this\s*time|thank\s*you|lose|lost|better\s*luck/i.test(s.label)) && (
+          <p className="mt-3 text-xs text-amber-600">
+            ⚠ A segment that looks like a losing wedge (e.g. "Not This Time") has its own label typed into the Prize
+            field — that makes it a real win. Leave Prize empty for a losing segment.
+          </p>
+        )}
+
         {segmentsError && <p className="mt-3 text-xs text-red-600">{segmentsError}</p>}
 
         <button
