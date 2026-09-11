@@ -9,6 +9,7 @@ import {
   localDateKey,
   getSpinEventWindow,
   getQueueClaimCounts,
+  getClaimedWindowIndicesForDate,
 } from "@/lib/spinQueue";
 
 export async function GET(req: NextRequest) {
@@ -16,10 +17,11 @@ export async function GET(req: NextRequest) {
 
   const dateKey = req.nextUrl.searchParams.get("date") ?? localDateKey(new Date());
   const segments = await getSpinSegments();
-  const [queue, eventWindow, claimedCounts] = await Promise.all([
+  const [queue, eventWindow, claimedCounts, claimedIndices] = await Promise.all([
     getSpinQueue(dateKey, segments),
     getSpinEventWindow(),
     getQueueClaimCounts(dateKey),
+    getClaimedWindowIndicesForDate(dateKey),
   ]);
 
   const totalCounts: Record<string, number> = {};
@@ -29,7 +31,15 @@ export async function GET(req: NextRequest) {
     remainingCounts[prize] = totalCounts[prize] - (claimedCounts[prize] ?? 0);
   }
 
-  return NextResponse.json({ date: dateKey, queue, eventWindow, totalCounts, claimedCounts, remainingCounts });
+  return NextResponse.json({
+    date: dateKey,
+    queue,
+    eventWindow,
+    totalCounts,
+    claimedCounts,
+    remainingCounts,
+    claimedIndices,
+  });
 }
 
 export async function PUT(req: NextRequest) {

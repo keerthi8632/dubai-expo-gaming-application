@@ -317,7 +317,7 @@ function HomeInner() {
       </Modal>
 
       <Modal open={alreadyRegistered} onClose={() => setAlreadyRegistered(false)}>
-        <AlreadyRegisteredModal />
+        <AlreadyRegisteredModal onClose={() => setAlreadyRegistered(false)} />
       </Modal>
 
       <Modal open={showPlayPrompt} onClose={() => setShowPlayPrompt(false)}>

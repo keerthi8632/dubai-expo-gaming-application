@@ -4,18 +4,30 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 
-export default function AlreadyRegisteredModal({ redirectSeconds = 10 }: { redirectSeconds?: number }) {
+export default function AlreadyRegisteredModal({
+  redirectSeconds = 10,
+  onClose,
+}: {
+  redirectSeconds?: number;
+  onClose?: () => void;
+}) {
   const router = useRouter();
   const [secondsLeft, setSecondsLeft] = useState(redirectSeconds);
 
+  const goHome = () => {
+    onClose?.();
+    router.push("/");
+  };
+
   useEffect(() => {
     if (secondsLeft <= 0) {
-      router.push("/");
+      goHome();
       return;
     }
     const t = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
     return () => clearTimeout(t);
-  }, [secondsLeft, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [secondsLeft]);
 
   return (
     <motion.div
@@ -40,7 +52,7 @@ export default function AlreadyRegisteredModal({ redirectSeconds = 10 }: { redir
       <p className="text-[13px] text-white/60">One registration per player — no do-overs, no cheat codes.</p>
 
       <button
-        onClick={() => router.push("/")}
+        onClick={goHome}
         className="mt-3 w-full rounded-[14px] bg-[#ffd400] py-3 text-[16px] font-black uppercase text-black transition-transform active:scale-95"
       >
         Back to Home

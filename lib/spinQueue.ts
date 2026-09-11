@@ -155,6 +155,18 @@ export function nextDueQueueIndex(claimed: ReadonlySet<number>, openIndex: numbe
   return null;
 }
 
+// Every window index claimed today, win or forfeit — used by the admin queue
+// list to grey out/hide slots that are already spoken for, since the queue
+// array itself has to stay index-stable (windowIndex math + existing claims
+// depend on it) and can't just have won entries spliced out.
+export async function getClaimedWindowIndicesForDate(dateKey: string): Promise<number[]> {
+  const claims = await prisma.spinQueueClaim.findMany({
+    where: { date: dateKey },
+    select: { windowIndex: true },
+  });
+  return claims.map((c) => c.windowIndex);
+}
+
 // How many of each prize in a day's queue have already been claimed
 // (including forfeited slots, which are gone for good too) — used to show
 // admins how many of each prize are still left to give away today.
