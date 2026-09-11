@@ -6,7 +6,7 @@ import { pickSegmentIndex, pickWeightedIndex } from "@/lib/spinSegments";
 import { getSpinSegments } from "@/lib/spinConfig";
 import { getSpinPrizeLimits, getWonPrizeCounts, JACKPOT_PRIZE_LABEL, isJackpotExpired } from "@/lib/spinPrizeLimits";
 import { getOtherGameSession, getLastSpinWinAt } from "@/lib/gameSessions";
-import { venueStartOfDay } from "@/lib/venueTime";
+import { venueStartOfDay, venueMinutesOfDay } from "@/lib/venueTime";
 import {
   localDateKey,
   getSpinEventWindow,
@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
 
   const forcedOutcome = (existing?.forcedOutcome as "WIN" | "LOSE" | null) ?? null;
   const now = new Date();
+  console.log("[spin/resolve] server clock:", now.toISOString(), "| venue (Dubai) date/time:", localDateKey(now), venueMinutesOfDay(now));
   const otherGame = await getOtherGameSession(participantId, "SPIN");
   // A participant can only ever win one of the two booth games — this is a
   // hard limit like prize stock/jackpot expiry, so it overrides even an
