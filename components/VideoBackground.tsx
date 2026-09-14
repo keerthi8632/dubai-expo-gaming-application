@@ -8,7 +8,7 @@ export default function VideoBackground() {
         muted
         loop
         playsInline
-        className="fixed inset-0 -z-20 h-full w-full object-cover blur-sm"
+        className="fixed inset-0 -z-20 h-full w-full object-contain"
       >
         <source src={BG_VIDEO} type="video/mp4" />
       </video>
