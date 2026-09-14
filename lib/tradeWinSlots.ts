@@ -21,18 +21,22 @@ export function slotForDate(date: Date): { startMinutes: number; endMinutes: num
 // Re-exported for existing call sites (e.g. app/api/leaderboard/route.ts).
 export const startOfDay = venueStartOfDay;
 
-function slotToDateRange(slot: { startMinutes: number; endMinutes: number }, day: Date) {
-  const base = startOfDay(day);
-  const from = new Date(base.getTime() + slot.startMinutes * 60000);
-  const to = new Date(base.getTime() + slot.endMinutes * 60000);
-  return { from, to };
+// How many of today's slots have started by `now` — this, not "is the
+// current slot free", is the win budget: a slot nobody played during its own
+// window doesn't lose its win, it just stays pending and rolls into whichever
+// later slot the next play actually falls in (mirrors the Spin & Win queue's
+// carry-forward behavior in lib/spinQueue.ts).
+export function slotsOpenedSoFar(now: Date): number {
+  const minutesOfDay = venueMinutesOfDay(now);
+  return TRADE_WIN_SLOTS.filter((s) => minutesOfDay >= s.startMinutes).length;
 }
 
 // Whether a win is still allowed right now: the current time must fall
-// inside one of the defined slots, and that slot must not already have a
-// winner today. This gates BOTH the random win-rate roll and admin-forced
-// WIN outcomes — the prize budget is fixed at 5 wins/day (10 total across
-// both games), so a slot that's already full blocks even a forced win.
+// inside one of the defined slots, and fewer wins must have happened today
+// than slots have opened so far. This gates BOTH the random win-rate roll
+// and admin-forced WIN outcomes — the prize budget is fixed at 5 wins/day
+// (10 total across both games), so once every opened slot's budget is spent,
+// even a forced win is blocked until the next slot opens.
 export async function canAwardWin(
   prisma: import("@prisma/client").PrismaClient,
   now: Date
@@ -40,13 +44,14 @@ export async function canAwardWin(
   const slot = slotForDate(now);
   if (!slot) return false;
 
-  const { from, to } = slotToDateRange(slot, now);
-  const existingWinner = await prisma.gameSession.findFirst({
+  const opened = slotsOpenedSoFar(now);
+  const dayStart = startOfDay(now);
+  const winsToday = await prisma.gameSession.count({
     where: {
       gameType: "TRADE",
       status: "WON",
-      completedAt: { gte: from, lt: to },
+      completedAt: { gte: dayStart, lt: now },
     },
   });
-  return existingWinner === null;
+  return winsToday < opened;
 }
