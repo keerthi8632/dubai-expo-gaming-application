@@ -6,7 +6,7 @@ import { ReactNode } from "react";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { CONFETTI_LOTTIE } from "@/lib/media";
 import { FUNDED_ACCOUNT_TERMS } from "@/lib/termsCopy";
-import { playWinChime } from "@/lib/winChime";
+import { playWinChime, playLossTone } from "@/lib/winChime";
 import Modal from "./Modal";
 import TermsModal from "./TermsModal";
 
@@ -63,6 +63,7 @@ export default function ResultModal({
   // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once on mount, not on every re-render
   useEffect(() => {
     if (won) playWinChime();
+    else playLossTone();
   }, []);
 
   return (
