@@ -192,7 +192,7 @@ function SpinGameInner() {
 
   return (
     <main className="flex min-h-screen h-[100dvh] flex-col items-center overflow-y-auto overflow-x-hidden">
-      <VideoBackground />
+      <VideoBackground blurred />
       <div className="w-full">
         <TopBar homeHref={`/?stage=gameHome${participantId ? `&participantId=${participantId}` : ""}`} />
       </div>

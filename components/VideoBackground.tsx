@@ -1,6 +1,6 @@
 import { BG_VIDEO } from "@/lib/media";
 
-export default function VideoBackground() {
+export default function VideoBackground({ blurred = false }: { blurred?: boolean }) {
   return (
     <>
       <video
@@ -8,7 +8,8 @@ export default function VideoBackground() {
         muted
         loop
         playsInline
-        className="fixed inset-0 -z-20 h-full w-full object-cover blur-sm"
+        preload="auto"
+        className={`fixed inset-0 -z-20 h-full w-full bg-black object-contain ${blurred ? "blur-sm" : ""}`}
       >
         <source src={BG_VIDEO} type="video/mp4" />
       </video>
