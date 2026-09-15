@@ -236,14 +236,14 @@ function TradeGameInner() {
 
   return (
     <main className="flex min-h-screen flex-col overflow-y-auto">
-      <VideoBackground />
+      <VideoBackground blurred />
       <TopBar homeHref={`/?stage=gameHome${participantId ? `&participantId=${participantId}` : ""}`} />
       <div className="mt-2">
         <PlayerBadge name={name} />
       </div>
 
       <div className="mx-[64px] mt-8 overflow-hidden rounded-2xl border border-brand-red/30 bg-white">
-        <div ref={containerRef} />
+        <div ref={containerRef} className="h-[460px]" />
         <div className="flex items-center justify-between border-t border-black/5 px-3 py-1.5">
           <span className="flex items-center gap-1 text-xs font-bold text-black/70">
             <span className="rounded bg-black px-1 py-0.5 text-[9px] font-black text-white">T7</span>
