@@ -8,7 +8,8 @@ export default function VideoBackground({ blurred = false }: { blurred?: boolean
         muted
         loop
         playsInline
-        className={`fixed inset-0 -z-20 h-full w-full object-contain ${blurred ? "blur-sm" : ""}`}
+        preload="auto"
+        className={`fixed inset-0 -z-20 h-full w-full bg-black object-contain ${blurred ? "blur-sm" : ""}`}
       >
         <source src={BG_VIDEO} type="video/mp4" />
       </video>
