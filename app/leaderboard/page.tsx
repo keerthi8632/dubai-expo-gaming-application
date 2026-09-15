@@ -59,7 +59,7 @@ export default function LeaderboardPage() {
     <main className="relative flex min-h-screen h-[100dvh] flex-col items-center overflow-y-auto overflow-x-hidden">
       <VideoBackground  blurred/>
       <div className="w-full">
-        <TopBar />
+        <TopBar hideQuit />
       </div>
 
       <div className="flex flex-col items-center">

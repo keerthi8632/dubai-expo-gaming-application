@@ -249,10 +249,6 @@ function SpinGameInner() {
         </div>
       </div>
 
-      <p className="mt-auto pb-6 sm:pb-[100px] text-center text-[10px] text-[#FFFFFF]">
-        Disclaimer: Charts are simulated (not live) and are for entertainment purposes only.
-      </p>
-
       <Modal open={phase === "revealing"} contentClassName="w-full max-w-[320px]">
         <CountdownModal onComplete={() => setResult(pendingResultRef.current)} />
       </Modal>

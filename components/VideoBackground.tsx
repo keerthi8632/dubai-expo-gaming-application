@@ -13,7 +13,9 @@ export default function VideoBackground({ blurred = false }: { blurred?: boolean
       >
         <source src={BG_VIDEO} type="video/mp4" />
       </video>
-      <div className="fixed inset-0 -z-10 from-black/70 via-black/50 to-black/80" />
+      {blurred && (
+        <div className="fixed inset-0 -z-10 bg-gradient-to-b from-black/70 via-black/50 to-black/80 bg-black/40" />
+      )}
     </>
   );
 }

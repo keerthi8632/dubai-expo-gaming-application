@@ -1,27 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 
 export default function AlreadyRegisteredModal({
   redirectSeconds = 10,
-  onClose,
+  // Resets the whole app/page.tsx stage back to a fresh first-visit state
+  // (not just closing this modal) — a plain router.push("/") from here is a
+  // same-URL no-op since this modal only ever shows while already on "/",
+  // which is why "Back to Home" used to look like it did nothing.
+  onQuit,
 }: {
   redirectSeconds?: number;
-  onClose?: () => void;
+  onQuit: () => void;
 }) {
-  const router = useRouter();
   const [secondsLeft, setSecondsLeft] = useState(redirectSeconds);
-
-  const goHome = () => {
-    onClose?.();
-    router.push("/");
-  };
 
   useEffect(() => {
     if (secondsLeft <= 0) {
-      goHome();
+      onQuit();
       return;
     }
     const t = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
@@ -52,10 +49,10 @@ export default function AlreadyRegisteredModal({
       <p className="text-[13px] text-white/60">One registration per player — no do-overs, no cheat codes.</p>
 
       <button
-        onClick={goHome}
+        onClick={onQuit}
         className="mt-3 w-full rounded-[14px] bg-[#ffd400] py-3 text-[16px] font-black uppercase text-black transition-transform active:scale-95"
       >
-        Back to Home
+        Quit
       </button>
       <p className="text-[11px] text-white/40">Whisking you home in {secondsLeft}s…</p>
     </motion.div>

@@ -50,6 +50,14 @@ function HomeInner() {
   const [stage, setStage] = useState<Stage>(searchParams.get("stage") === "gameHome" ? "gameHome" : "home");
   const existingParticipantId = searchParams.get("participantId");
   const [formOpen, setFormOpen] = useState(false);
+  // Bumped whenever the Alphorix iframe needs to be thrown away and remounted
+  // fresh — it's kept permanently mounted (see the render below) so it
+  // preloads instead of loading on click, but that means it never naturally
+  // resets after a submission: it stays parked on Alphorix's post-submit
+  // "Thank You" page. Without this, the next person to open the form (e.g.
+  // right after a Quit reset) would see that stale submitted state instead
+  // of a blank form.
+  const [formKey, setFormKey] = useState(0);
   const [termsGame, setTermsGame] = useState<"TRADE" | "SPIN" | null>(null);
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
   const [checkingGame, setCheckingGame] = useState<"TRADE" | "SPIN" | null>(null);
@@ -124,6 +132,9 @@ function HomeInner() {
   function handleRegistered(info?: AlphorixSubmission) {
     setRegistration(info);
     setFormOpen(false);
+    // Remount the iframe now, in the background, so it's preloaded fresh by
+    // the time this or another player next opens the form — see formKey.
+    setFormKey((k) => k + 1);
     if (formIntentRef.current === "register") {
       setShowPlayPrompt(true);
     } else {
@@ -216,16 +227,22 @@ function HomeInner() {
     setCheckingGame(null);
     setShowPlayPrompt(false);
     setPlayedGames({ TRADE: false, SPIN: false });
+    // No formKey bump here — the iframe only needs remounting after a real
+    // submission (handled in handleRegistered), which is what actually
+    // leaves it stale. Bumping on every plain Quit forced a fresh reload
+    // right before the next Play Now/Register click, which is the opposite
+    // of what preloading was for — a visible delay with no way to refresh
+    // around it on a kiosk screen.
     router.replace("/");
   }
 
   return (
     <main className="relative flex h-screen w-screen flex-col overflow-hidden">
-      <VideoBackground />
+      <VideoBackground blurred={stage === "gameHome"} />
 
       {stage === "gameHome" && (
         <div className="relative z-10 shrink-0">
-          <TopBar onHome={resetToHome} onQuit={resetToHome} />
+          <TopBar hideHome onQuit={resetToHome} />
         </div>
       )}
 
@@ -285,9 +302,11 @@ function HomeInner() {
                 </span>
               </button>
             )}
-            <p className="w-full whitespace-nowrap text-center text-xs font-normal leading-[18px] tracking-normal text-white">
-              Disclaimer: Charts are simulated (not live) and are for entertainment purposes only.
-            </p>
+            {stage === "home" && (
+              <p className="w-full whitespace-nowrap text-center text-xs font-normal leading-[18px] tracking-normal text-white">
+                Disclaimer: Charts are simulated (not live) and are for entertainment purposes only.
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -306,7 +325,7 @@ function HomeInner() {
           className="no-scrollbar relative h-[49vh] max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white text-black"
         >
           <CloseButton onClose={() => setFormOpen(false)} />
-          <AlphorixForm formId="57237fa43377" onSubmitted={handleRegistered} />
+          <AlphorixForm key={formKey} formId="57237fa43377" onSubmitted={handleRegistered} />
         </div>
       </div>
 
@@ -316,8 +335,8 @@ function HomeInner() {
         )}
       </Modal>
 
-      <Modal open={alreadyRegistered} onClose={() => setAlreadyRegistered(false)}>
-        <AlreadyRegisteredModal onClose={() => setAlreadyRegistered(false)} />
+      <Modal open={alreadyRegistered} onClose={resetToHome}>
+        <AlreadyRegisteredModal onQuit={resetToHome} />
       </Modal>
 
       <Modal open={showPlayPrompt} onClose={() => setShowPlayPrompt(false)}>

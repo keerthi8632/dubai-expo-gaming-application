@@ -17,9 +17,15 @@ type Props = {
   // set, these run instead of navigating, resetting state directly.
   onHome?: () => void;
   onQuit?: () => void;
+  // Trade/Spin game pages drop Home — in practice it ended up doing the same
+  // full reset as Quit, so having both was just a redundant second button.
+  hideHome?: boolean;
+  // Leaderboard drops Quit — it's a passive venue-screen view, not a game
+  // session to exit, so Home is the only nav it needs.
+  hideQuit?: boolean;
 };
 
-export default function TopBar({ homeHref = "/", onHome, onQuit }: Props) {
+export default function TopBar({ homeHref = "/", onHome, onQuit, hideHome = false, hideQuit = false }: Props) {
   const router = useRouter();
   // Client-side router.push, not a hard window.location navigation — a real
   // page load tears down and recreates the document, which drops the
@@ -29,19 +35,27 @@ export default function TopBar({ homeHref = "/", onHome, onQuit }: Props) {
   // so a soft nav gets the same fresh-start result without exiting fullscreen.
   return (
     <div className="flex items-center justify-between px-[64px] py-[80px]">
-      <button
-        onClick={() => (onHome ? onHome() : router.push(homeHref))}
-        className="transition-transform active:scale-95"
-      >
-        <img src={HOME_BUTTON} alt="Home" className="h-14" />
-      </button>
+      {hideHome ? (
+        <div />
+      ) : (
+        <button
+          onClick={() => (onHome ? onHome() : router.push(homeHref))}
+          className="transition-transform active:scale-95"
+        >
+          <img src={HOME_BUTTON} alt="Home" className="h-14" />
+        </button>
+      )}
       <img src={LOGO} alt="MH Markets" className="h-10" />
-      <button
-        onClick={() => (onQuit ? onQuit() : router.push("/"))}
-        className="transition-transform active:scale-95"
-      >
-        <img src={QUIT_BUTTON} alt="Quit" className="h-14" />
-      </button>
+      {hideQuit ? (
+        <div />
+      ) : (
+        <button
+          onClick={() => (onQuit ? onQuit() : router.push("/"))}
+          className="transition-transform active:scale-95"
+        >
+          <img src={QUIT_BUTTON} alt="Quit" className="h-14" />
+        </button>
+      )}
     </div>
   );
 }

@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
       resultDetail: toJson({ entryPrice, exitPrice, prediction }),
       startedAt: now,
       completedAt: now,
-      prizeLabel: won ? "USD 100 Funded Account" : null,
+      prizeLabel: won ? "Gold Coin" : null,
       claimCode,
     },
     update: {
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
       resultDetail: toJson({ entryPrice, exitPrice, prediction }),
       startedAt: now,
       completedAt: now,
-      prizeLabel: won ? "USD 100 Funded Account" : null,
+      prizeLabel: won ? "Gold Coin" : null,
       claimCode,
     },
   });
@@ -94,6 +94,7 @@ export async function POST(req: NextRequest) {
     entryPrice,
     exitPrice,
     claimCode: session.claimCode,
+    prizeLabel: session.prizeLabel,
     otherGamePlayed,
   });
 }

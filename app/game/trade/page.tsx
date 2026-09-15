@@ -12,7 +12,7 @@ import AlreadyPlayedModal from "@/components/AlreadyPlayedModal";
 import Modal from "@/components/Modal";
 import VideoBackground from "@/components/VideoBackground";
 import { PREDICT_NOW_BUTTON, WON_ICON, LOSS_ICON, GRAPH_ICON, MODEL_ARROW_ICON } from "@/lib/media";
-import { FUNDED_ACCOUNT_NOTE } from "@/lib/prizes";
+import { isFundedAccountPrize, FUNDED_ACCOUNT_NOTE } from "@/lib/prizes";
 
 const HISTORY_POINTS = 150;
 const IDLE_TICK_MS = 300;
@@ -55,7 +55,13 @@ function TradeGameInner() {
   const [phase, setPhase] = useState<"idle" | "frozen" | "countdown" | "revealing" | "done">("idle");
   const [entryPrice, setEntryPrice] = useState(0);
   const [livePrice, setLivePrice] = useState<number | null>(null);
-  const [result, setResult] = useState<{ status: "WON" | "LOST"; entryPrice: number; exitPrice: number; otherGamePlayed?: boolean } | null>(null);
+  const [result, setResult] = useState<{
+    status: "WON" | "LOST";
+    entryPrice: number;
+    exitPrice: number;
+    prizeLabel?: string | null;
+    otherGamePlayed?: boolean;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [alreadyPlayed, setAlreadyPlayed] = useState(false);
   const resolveRef = useRef<Promise<{ res: Response; data: any }> | null>(null);
@@ -238,11 +244,11 @@ function TradeGameInner() {
     <main className="flex min-h-screen flex-col overflow-y-auto">
       <VideoBackground blurred />
       <TopBar homeHref={`/?stage=gameHome${participantId ? `&participantId=${participantId}` : ""}`} />
-      <div className="mt-2">
+      <div className="mt-24">
         <PlayerBadge name={name} />
       </div>
 
-      <div className="mx-[64px] mt-8 overflow-hidden rounded-2xl border border-brand-red/30 bg-white">
+      <div className="mx-[64px] mt-20 overflow-hidden rounded-2xl border border-brand-red/30 bg-white">
         <div ref={containerRef} className="h-[460px]" />
         <div className="flex items-center justify-between border-t border-black/5 px-3 py-1.5">
           <span className="flex items-center gap-1 text-xs font-bold text-black/70">
@@ -297,10 +303,6 @@ function TradeGameInner() {
 
       {error && <p className="mt-2 text-center text-xs text-red-400">{error}</p>}
 
-      <p className="mt-auto pb-[100px] text-center text-[10px] text-[#FFFFFF]">
-        Disclaimer: Charts are simulated (not live) and are for entertainment purposes only.
-      </p>
-
       <Modal open={phase === "frozen"} contentClassName="w-full max-w-[500px]">
         <PredictionModal price={entryPrice} onPredict={handlePredict} />
       </Modal>
@@ -319,11 +321,23 @@ function TradeGameInner() {
             showPlayAnother={!result.otherGamePlayed}
             title={result.status === "WON" ? "You Won!" : "You Lost!"}
             subtitle={
-              result.status === "WON"
-                ? "Great prediction! The market moved in your favor."
-                : "The market moved against your prediction"
+              result.status === "WON" ? (
+                <>
+                  Great prediction! You&apos;ve won a{" "}
+                  <span className="font-bold text-[#1a1a1a]">{result.prizeLabel}</span>.
+                </>
+              ) : (
+                "The market moved against your prediction"
+              )
             }
-            note={result.status === "WON" ? FUNDED_ACCOUNT_NOTE : undefined}
+            note={
+              result.status === "WON"
+                ? isFundedAccountPrize(result.prizeLabel)
+                  ? FUNDED_ACCOUNT_NOTE
+                  : "Reach out to our sales team to claim your prize."
+                : undefined
+            }
+            showFundedAccountTerms={result.status === "WON" && isFundedAccountPrize(result.prizeLabel)}
             detail={
               <div className="flex items-center justify-center gap-3.5 self-stretch rounded-2xl bg-[#F5F6F8] px-3.5 py-4">
                 <div className="flex w-[159px] flex-col">
