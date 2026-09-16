@@ -79,9 +79,9 @@ function TradeGameInner() {
       const chart = createChart(containerRef.current, {
         layout: { background: { color: "#ffffff" }, textColor: "#222" },
         grid: { vertLines: { color: "#eee" }, horzLines: { color: "#eee" } },
-        rightPriceScale: { borderVisible: false },
+        rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.08, bottom: 0.02 } },
         timeScale: { borderVisible: false, visible: true },
-        height: 460,
+        height: 600,
       });
       const series = chart.addAreaSeries({
         lineColor: "#2563eb",
@@ -106,8 +106,15 @@ function TradeGameInner() {
       livePriceRef.current = price;
       liveTimeRef.current = startTime + HISTORY_POINTS;
 
-      const resize = () => chart.applyOptions({ width: containerRef.current!.clientWidth });
+      // Drives both dimensions off the container's actual rendered box instead
+      // of a hardcoded height — a static height option here can drift from the
+      // container's real CSS height (e.g. after a Tailwind class change), which
+      // otherwise leaves a blank gap below the chart with nothing to redraw it.
+      const resize = () =>
+        chart.resize(containerRef.current!.clientWidth, containerRef.current!.clientHeight);
       resize();
+      const resizeObserver = new ResizeObserver(resize);
+      resizeObserver.observe(containerRef.current);
       window.addEventListener("resize", resize);
 
       // Keep the market "alive" — wanders continuously until the player hits Start Now.
@@ -123,6 +130,7 @@ function TradeGameInner() {
 
       cleanup = () => {
         window.removeEventListener("resize", resize);
+        resizeObserver.disconnect();
         if (idleIntervalRef.current) clearInterval(idleIntervalRef.current);
         chart.remove();
       };
@@ -249,7 +257,7 @@ function TradeGameInner() {
       </div>
 
       <div className="mx-[64px] mt-20 overflow-hidden rounded-2xl border border-brand-red/30 bg-white">
-        <div ref={containerRef} className="h-[460px]" />
+        <div ref={containerRef} className="h-[600px]" />
         <div className="flex items-center justify-between border-t border-black/5 px-3 py-1.5">
           <span className="flex items-center gap-1 text-xs font-bold text-black/70">
             <span className="rounded bg-black px-1 py-0.5 text-[9px] font-black text-white">T7</span>
