@@ -241,7 +241,7 @@ function TradeGameInner() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col overflow-y-auto">
+    <main className="flex min-h-screen flex-col overflow-y-auto pb-12">
       <VideoBackground blurred />
       <TopBar homeHref={`/?stage=gameHome${participantId ? `&participantId=${participantId}` : ""}`} />
       <div className="mt-24">
@@ -302,6 +302,10 @@ function TradeGameInner() {
       )}
 
       {error && <p className="mt-2 text-center text-xs text-red-400">{error}</p>}
+
+      <p className="fixed inset-x-0 bottom-0 z-10 px-4 pb-4 text-center text-xs font-normal leading-[18px] tracking-normal text-white/70">
+        Disclaimer: Charts are simulated (not live) and are for entertainment purposes only.
+      </p>
 
       <Modal open={phase === "frozen"} contentClassName="w-full max-w-[500px]">
         <PredictionModal price={entryPrice} onPredict={handlePredict} />

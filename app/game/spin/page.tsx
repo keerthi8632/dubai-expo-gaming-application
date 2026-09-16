@@ -200,7 +200,7 @@ function SpinGameInner() {
         <PlayerBadge name={name} />
       </div>
 
-      <div className="mt-6 flex w-full flex-1 flex-col items-center justify-start">
+      <div className="mt-6 flex w-full flex-1 flex-col items-center justify-start pb-12">
         <div
           className="relative aspect-square w-full max-w-[953.297px]"
           style={{ maxWidth: `min(${WHEEL_SIZE}px, 88vw, 50vh)` }}
@@ -248,6 +248,10 @@ function SpinGameInner() {
           </button>
         </div>
       </div>
+
+      <p className="fixed inset-x-0 bottom-0 z-10 px-4 pb-4 text-center text-xs font-normal leading-[18px] tracking-normal text-white/70">
+        T&amp;Cs Apply
+      </p>
 
       <Modal open={phase === "revealing"} contentClassName="w-full max-w-[320px]">
         <CountdownModal onComplete={() => setResult(pendingResultRef.current)} />

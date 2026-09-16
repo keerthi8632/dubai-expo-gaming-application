@@ -317,11 +317,6 @@ function HomeInner() {
                 </span>
               </button>
             )}
-            {stage === "home" && (
-              <p className="w-full whitespace-nowrap text-center text-xs font-normal leading-[18px] tracking-normal text-white">
-                Disclaimer: Charts are simulated (not live) and are for entertainment purposes only.
-              </p>
-            )}
           </div>
         </div>
       </div>

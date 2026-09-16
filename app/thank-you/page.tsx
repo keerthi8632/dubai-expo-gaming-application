@@ -73,20 +73,14 @@ function ThankYouInner() {
 
       <img src={LOGO} alt="MH Markets" className="absolute top-8 h-8" />
 
-      <div className="relative z-10 mx-auto max-w-xl px-6 text-center text-white">
-        <h1 className="text-3xl font-bold md:text-4xl">Thank you for contacting MH Markets!</h1>
-        <h2 className="mt-3 text-xl font-semibold md:text-2xl">We&apos;ve received your request successfully.</h2>
-        <p className="mt-6 text-base font-semibold md:text-lg">
-          One of our sales representatives will call you shortly to guide you through your trading journey.
-        </p>
-        <p className="mt-6 text-sm text-white/70">Taking you to your game...</p>
+      <div className="relative z-10 mx-auto max-w-5xl px-10 text-center text-white">
+        <h1 className="text-5xl font-bold leading-loose tracking-wide md:text-4xl" style={{ lineHeight: 1.8 }}>
+          Thank you for connecting with MH Markets. Your registration is complete.
+        </h1>
+        {/* <p className="mt-8 text-base text-white/70">Taking you to your game...</p> */}
       </div>
 
-      <img
-        src="/media/background/c36c02aa74d2e08436f033a7e05b19a667d30cfa.png"
-        alt=""
-        className="absolute -bottom-10 w-[500px] max-w-[70vw] rotate-[75deg]"
-      />
+   
     </main>
   );
 }
