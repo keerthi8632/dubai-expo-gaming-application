@@ -73,9 +73,15 @@ function ThankYouInner() {
 
       <img src={LOGO} alt="MH Markets" className="absolute top-8 h-8" />
 
-      <div className="relative z-10 mx-auto max-w-5xl px-10 text-center text-white">
-        <h1 className="text-5xl font-bold leading-loose tracking-wide md:text-4xl" style={{ lineHeight: 1.8 }}>
-          Thank you for connecting with MH Markets. Your registration is complete.
+      <div className="relative z-10 mx-auto max-w-2xl px-10 text-center text-white">
+        <h1
+          className="font-normal"
+          style={{ fontFamily: "var(--font-inter)", fontSize: 42.27, lineHeight: "100%", letterSpacing: 0 }}
+        >
+          Thank you for connecting with <span className="font-bold">MH Markets.</span>
+          <br />
+          <br />
+          <span className="font-bold">Your Registration is complete!</span>
         </h1>
         {/* <p className="mt-8 text-base text-white/70">Taking you to your game...</p> */}
       </div>
