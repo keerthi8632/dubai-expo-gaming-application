@@ -58,6 +58,11 @@ function HomeInner() {
   // right after a Quit reset) would see that stale submitted state instead
   // of a blank form.
   const [formKey, setFormKey] = useState(0);
+  // Set when the Alphorix iframe reloaded without us ever seeing a real
+  // submission signal (see AlphorixForm's onUncertain) — rather than
+  // silently guessing "submitted" and creating a Guest participant, this
+  // shows a retry prompt over the form so the visitor can resubmit.
+  const [formUncertain, setFormUncertain] = useState(false);
   const [termsGame, setTermsGame] = useState<"TRADE" | "SPIN" | null>(null);
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
   const [checkingGame, setCheckingGame] = useState<"TRADE" | "SPIN" | null>(null);
@@ -126,12 +131,14 @@ function HomeInner() {
       handleRegistered(undefined);
       return;
     }
+    setFormUncertain(false);
     setFormOpen(true);
   }
 
   function handleRegistered(info?: AlphorixSubmission) {
     setRegistration(info);
     setFormOpen(false);
+    setFormUncertain(false);
     // Remount the iframe now, in the background, so it's preloaded fresh by
     // the time this or another player next opens the form — see formKey.
     setFormKey((k) => k + 1);
@@ -140,6 +147,14 @@ function HomeInner() {
     } else {
       setStage("gameHome");
     }
+  }
+
+  // The visitor hit "Try again" after an uncertain submission — throw away
+  // the current iframe (which is stuck on whatever ambiguous state it
+  // reloaded into) and mount a fresh, blank one.
+  function retryForm() {
+    setFormUncertain(false);
+    setFormKey((k) => k + 1);
   }
 
   // Which games this participant has already completed — checked against the
@@ -325,7 +340,25 @@ function HomeInner() {
           className="no-scrollbar relative h-[49vh] max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white text-black"
         >
           <CloseButton onClose={() => setFormOpen(false)} />
-          <AlphorixForm key={formKey} formId="57237fa43377" onSubmitted={handleRegistered} />
+          <AlphorixForm
+            key={formKey}
+            formId="57237fa43377"
+            onSubmitted={handleRegistered}
+            onUncertain={() => setFormUncertain(true)}
+          />
+          {formUncertain && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-white/95 p-8 text-center">
+              <p className="text-lg font-semibold text-black">
+                Didn&apos;t catch that — please try submitting again.
+              </p>
+              <button
+                onClick={retryForm}
+                className="rounded-xl bg-brand-red px-8 py-3 font-bold text-white transition-transform active:scale-[0.98]"
+              >
+                Try Again
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

@@ -12,10 +12,15 @@ export type AlphorixSubmission = {
 
 type Props = {
   formId: string;
-  // Fires once on submit. `info` carries whatever field values arrived via
-  // postMessage — undefined if the form navigated (see handleLoad below)
-  // without ever posting a message we recognized.
-  onSubmitted?: (info?: AlphorixSubmission) => void;
+  // Fires once on submit, only when we actually received real field data
+  // (via postMessage or the /thank-you bridge) — never with a guessed
+  // "no-data" signal. See onUncertain below for the alternative case.
+  onSubmitted?: (info: AlphorixSubmission) => void;
+  // Fires if the iframe reloaded a 2nd time without ever seeing a submission
+  // signal — this is ambiguous (could be a real submit whose postMessage we
+  // missed, or just an internal form navigation) so instead of guessing we
+  // hand back control to the caller to show a "please try again" prompt.
+  onUncertain?: () => void;
 };
 
 const ALPHORIX_ORIGIN = "https://alphorix.net";
@@ -66,13 +71,14 @@ function extractSubmission(data: unknown): AlphorixSubmission | undefined {
   return hasAnyValue ? submission : undefined;
 }
 
-export default function AlphorixForm({ formId, onSubmitted }: Props) {
+export default function AlphorixForm({ formId, onSubmitted, onUncertain }: Props) {
   // Counts iframe navigations. If a submission postMessage never arrives,
   // the form still does a full (non-SPA) submit that navigates the iframe —
   // onLoad firing a second time is the fallback signal that it was
   // submitted, just without field data to pass along.
   const loadCountRef = useRef(0);
   const submittedRef = useRef(false);
+  const uncertainRef = useRef(false);
 
   useEffect(() => {
     if (!onSubmitted) return;
@@ -106,7 +112,7 @@ export default function AlphorixForm({ formId, onSubmitted }: Props) {
       if (event.origin !== ALPHORIX_ORIGIN) return;
       if (!looksLikeSubmitSuccess(event.data)) return;
       submittedRef.current = true;
-      onSubmitted?.(extractSubmission(event.data));
+      onSubmitted?.(extractSubmission(event.data) ?? {});
     }
 
     window.addEventListener("message", handleMessage);
@@ -122,12 +128,16 @@ export default function AlphorixForm({ formId, onSubmitted }: Props) {
     // eslint-disable-next-line no-console
     console.log(`[AlphorixForm] iframe onLoad #${loadCountRef.current} at`, new Date().toISOString());
 
-    // Only fall back to the no-data signal if the postMessage handler above
-    // hasn't already fired for this submission.
-    if (loadCountRef.current > 1 && !submittedRef.current) {
+    // A 2nd load without ever seeing a submission signal is ambiguous — it
+    // could be a real submit whose postMessage we missed, or just an
+    // internal form navigation mid-fill. Rather than guessing "submitted
+    // with no data" (which used to silently create a Guest participant),
+    // hand it to the caller to prompt the visitor to try again.
+    if (loadCountRef.current > 1 && !submittedRef.current && !uncertainRef.current) {
+      uncertainRef.current = true;
       // eslint-disable-next-line no-console
-      console.log("[AlphorixForm] no submission postMessage was ever received — falling back to no-data signal.");
-      onSubmitted?.(undefined);
+      console.log("[AlphorixForm] no submission postMessage was ever received — flagging as uncertain.");
+      onUncertain?.();
     }
   }
 
