@@ -16,7 +16,7 @@ type SpinEventWindow = { startHour: number; startMinute: number; endHour: number
 // that server-only module) so this client component doesn't pull Prisma into
 // the browser bundle.
 const JACKPOT_DAY = "2026-09-23";
-const JACKPOT_PRIZE_LABEL = "USD 1,000 Funded Account";
+const JACKPOT_PRIZE_LABEL = "$1,000 Funded Account";
 
 function todayKey() {
   const d = new Date();

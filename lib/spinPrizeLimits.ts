@@ -10,7 +10,7 @@ export const DEFAULT_SPIN_PRIZE_LIMITS: Record<string, number> = {
   "Amazon Vouchers": 20,
   "Premium Merchandise": 30,
   "USD 100 Funded Account": 10,
-  "USD 1,000 Funded Account": 1,
+  "$1,000 Funded Account": 1,
 };
 
 export async function getSpinPrizeLimits(): Promise<Record<string, number>> {
@@ -23,7 +23,7 @@ export async function getSpinPrizeLimits(): Promise<Record<string, number>> {
 // The jackpot is only available through the last day of the event — after
 // this date its segment is excluded from the winnable pool entirely, the
 // same way a sold-out prize is (see excludedIndices in resolve/route.ts).
-export const JACKPOT_PRIZE_LABEL = "USD 1,000 Funded Account";
+export const JACKPOT_PRIZE_LABEL = "$1,000 Funded Account";
 export const JACKPOT_LAST_AVAILABLE_DATE = "2026-09-23";
 
 export function isJackpotExpired(now: Date = new Date()): boolean {

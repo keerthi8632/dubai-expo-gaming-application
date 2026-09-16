@@ -71,7 +71,7 @@ export const spinSegmentsSchema = z
 // — that module pulls in the Prisma client, and this file is imported by the
 // client component RegisterModal.tsx, so importing it here would leak
 // Prisma into the browser bundle.
-const JACKPOT_PRIZE_LABEL = "USD 1,000 Funded Account";
+const JACKPOT_PRIZE_LABEL = "$1,000 Funded Account";
 
 export const spinQueueSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
