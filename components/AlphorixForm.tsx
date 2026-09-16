@@ -79,6 +79,7 @@ export default function AlphorixForm({ formId, onSubmitted, onUncertain }: Props
   const loadCountRef = useRef(0);
   const submittedRef = useRef(false);
   const uncertainRef = useRef(false);
+  const uncertainTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!onSubmitted) return;
@@ -99,6 +100,10 @@ export default function AlphorixForm({ formId, onSubmitted, onUncertain }: Props
         const data = event.data as Record<string, unknown> | null;
         if (data?.type === "alphorix-thank-you") {
           submittedRef.current = true;
+          if (uncertainTimerRef.current) {
+            clearTimeout(uncertainTimerRef.current);
+            uncertainTimerRef.current = null;
+          }
           onSubmitted?.({
             firstName: typeof data.firstName === "string" ? data.firstName : undefined,
             lastName: typeof data.lastName === "string" ? data.lastName : undefined,
@@ -112,12 +117,22 @@ export default function AlphorixForm({ formId, onSubmitted, onUncertain }: Props
       if (event.origin !== ALPHORIX_ORIGIN) return;
       if (!looksLikeSubmitSuccess(event.data)) return;
       submittedRef.current = true;
+      if (uncertainTimerRef.current) {
+        clearTimeout(uncertainTimerRef.current);
+        uncertainTimerRef.current = null;
+      }
       onSubmitted?.(extractSubmission(event.data) ?? {});
     }
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [onSubmitted]);
+
+  useEffect(() => {
+    return () => {
+      if (uncertainTimerRef.current) clearTimeout(uncertainTimerRef.current);
+    };
+  }, []);
 
   function handleLoad() {
     loadCountRef.current += 1;
@@ -130,14 +145,22 @@ export default function AlphorixForm({ formId, onSubmitted, onUncertain }: Props
 
     // A 2nd load without ever seeing a submission signal is ambiguous — it
     // could be a real submit whose postMessage we missed, or just an
-    // internal form navigation mid-fill. Rather than guessing "submitted
-    // with no data" (which used to silently create a Guest participant),
-    // hand it to the caller to prompt the visitor to try again.
-    if (loadCountRef.current > 1 && !submittedRef.current && !uncertainRef.current) {
-      uncertainRef.current = true;
-      // eslint-disable-next-line no-console
-      console.log("[AlphorixForm] no submission postMessage was ever received — flagging as uncertain.");
-      onUncertain?.();
+    // internal form navigation mid-fill. It could also be a REAL submit
+    // whose /thank-you bridge page just landed but deliberately delays its
+    // postMessage by AUTO_CONTINUE_DELAY_MS (4.5s, so the visitor has time
+    // to read the confirmation) — see app/thank-you/page.tsx. So rather than
+    // guessing right away, wait longer than that delay for the real signal
+    // to arrive before treating it as genuinely uncertain. Must stay ahead
+    // of AUTO_CONTINUE_DELAY_MS there — keep both in sync if either changes.
+    if (loadCountRef.current > 1 && !submittedRef.current && !uncertainRef.current && !uncertainTimerRef.current) {
+      uncertainTimerRef.current = setTimeout(() => {
+        uncertainTimerRef.current = null;
+        if (submittedRef.current || uncertainRef.current) return;
+        uncertainRef.current = true;
+        // eslint-disable-next-line no-console
+        console.log("[AlphorixForm] no submission postMessage was ever received — flagging as uncertain.");
+        onUncertain?.();
+      }, 5500);
     }
   }
 

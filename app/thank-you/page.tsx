@@ -14,7 +14,11 @@ import { LOGO } from "@/lib/media";
 // - if it ever loads at the top level instead (redirect breaks out of the
 //   iframe), fall back to a normal client-side redirect carrying the same
 //   fields as query params.
-const AUTO_CONTINUE_DELAY_MS = 2500;
+// NOTE: AlphorixForm.tsx's "uncertain submission" grace period (currently
+// 3500ms) must stay longer than this delay — it exists specifically to wait
+// out this page's own postMessage, so bumping this without bumping that back
+// out would bring back the "Try Again" flash over this very confirmation.
+const AUTO_CONTINUE_DELAY_MS = 4500;
 
 export default function ThankYouPage() {
   return (
