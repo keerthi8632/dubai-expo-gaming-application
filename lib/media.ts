@@ -1,4 +1,5 @@
 export const LOGO = "/media/logo.svg";
+export const WIN_SOUND = "/media/win.mp3";
 export const BG_VIDEO = "https://media.mohicanstech.com/reel%20update.mp4";
 export const NAME_BOARD = "/media/nameBoard.png";
 export const PLAY_BUTTON = "/media/Play Button.svg";

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import DatePicker from "@/components/DatePicker";
 
 type SpinSegment = {
   label: string;
@@ -428,12 +429,7 @@ export default function ConfigPage() {
         <div className="mt-4 flex flex-wrap items-end gap-4">
           <label className="flex flex-col text-xs font-medium text-black/60">
             Day
-            <input
-              type="date"
-              value={queueDate}
-              onChange={(e) => setQueueDate(e.target.value)}
-              className="mt-1 rounded border px-2 py-1 text-sm"
-            />
+            <DatePicker value={queueDate} onChange={setQueueDate} className="mt-1" />
           </label>
           <label className="flex flex-col text-xs font-medium text-black/60">
             Event start

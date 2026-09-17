@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import TopBar from "@/components/TopBar";
 import VideoBackground from "@/components/VideoBackground";
+import DatePicker from "@/components/DatePicker";
 
 type Winner = {
   id: string;
@@ -29,14 +30,25 @@ function isJackpot(prizeLabel: string | null): boolean {
   return !!prizeLabel && /1,?000/.test(prizeLabel);
 }
 
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export default function LeaderboardPage() {
   const [winners, setWinners] = useState<Winner[]>([]);
   const [loading, setLoading] = useState(true);
   const [pulse, setPulse] = useState(false);
+  // Empty = today (the default live view). Set once the visitor picks a
+  // different date — polling is skipped for a past day since it's a fixed,
+  // already-final list, not something that needs refreshing every minute.
+  const [dateFilter, setDateFilter] = useState("");
+  const isToday = !dateFilter || dateFilter === todayKey();
 
   useEffect(() => {
     function load() {
-      fetch("/api/leaderboard")
+      const params = dateFilter ? `?date=${dateFilter}` : "";
+      fetch(`/api/leaderboard${params}`)
         .then((res) => res.json())
         .then((data) => {
           if (Array.isArray(data.winners)) setWinners(data.winners);
@@ -47,10 +59,12 @@ export default function LeaderboardPage() {
         .finally(() => setLoading(false));
     }
 
+    setLoading(true);
     load();
+    if (!isToday) return;
     const interval = setInterval(load, POLL_MS);
     return () => clearInterval(interval);
-  }, []);
+  }, [dateFilter, isToday]);
 
   // Chronological — the day's first winner leads the board, newest joins at the bottom.
   const ordered = winners;
@@ -67,11 +81,32 @@ export default function LeaderboardPage() {
           className="font-orbitron text-center text-[36px] font-black tracking-wide text-white sm:text-[52px]"
           style={{ textShadow: "0 0 30px rgba(179,18,23,0.55), 0 0 60px rgba(179,18,23,0.25)" }}
         >
-          🏆 Today&apos;s Winners
+          🏆 {isToday ? "Today's" : "That Day's"} Winners
         </h1>
-        <div className="mt-3 flex items-center gap-2 text-sm text-white/50">
-          <span className={`h-2 w-2 rounded-full bg-[#34c759] ${pulse ? "animate-ping" : ""}`} />
-          <span>Live &mdash; updates automatically</span>
+        {isToday ? (
+          <div className="mt-3 flex items-center gap-2 text-sm text-white/50">
+            <span className={`h-2 w-2 rounded-full bg-[#34c759] ${pulse ? "animate-ping" : ""}`} />
+            <span>Live &mdash; updates automatically</span>
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-white/50">Viewing a past day &mdash; not live</p>
+        )}
+
+        <div className="mt-4 flex items-center gap-2">
+          <DatePicker
+            theme="dark"
+            value={dateFilter || todayKey()}
+            max={todayKey()}
+            onChange={(v) => setDateFilter(v === todayKey() ? "" : v)}
+          />
+          {!isToday && (
+            <button
+              onClick={() => setDateFilter("")}
+              className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/15"
+            >
+              Today
+            </button>
+          )}
         </div>
       </div>
 
@@ -81,7 +116,11 @@ export default function LeaderboardPage() {
         ) : ordered.length === 0 ? (
           <div className="mt-10 text-center text-white/50">
             <p className="text-4xl">🎯</p>
-            <p className="mt-3">No winners yet today &mdash; the board is waiting for its first champion!</p>
+            <p className="mt-3">
+              {isToday
+                ? "No winners yet today — the board is waiting for its first champion!"
+                : "No winners were recorded on this day."}
+            </p>
           </div>
         ) : (
           <ul className="space-y-4">

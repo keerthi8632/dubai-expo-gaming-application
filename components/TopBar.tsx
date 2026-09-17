@@ -33,8 +33,14 @@ export default function TopBar({ homeHref = "/", onHome, onQuit, hideHome = fals
   // another click before it can re-request it. page.tsx's own effect
   // already resets all state back to a clean slate when it lands on "/",
   // so a soft nav gets the same fresh-start result without exiting fullscreen.
+  // The logo is pinned to the bar's true center via absolute positioning,
+  // independent of the Home/Quit buttons on either side — a plain
+  // justify-between balances the logo against whatever the two side
+  // elements' widths happen to be, so hiding one button (an empty <div />
+  // vs. a real, sizeable button image) throws the logo off-center instead
+  // of keeping it fixed.
   return (
-    <div className="flex items-center justify-between px-[64px] py-[80px]">
+    <div className="relative flex items-center justify-between px-[64px] py-[80px]">
       {hideHome ? (
         <div />
       ) : (
@@ -45,7 +51,11 @@ export default function TopBar({ homeHref = "/", onHome, onQuit, hideHome = fals
           <img src={HOME_BUTTON} alt="Home" className="h-14" />
         </button>
       )}
-      <img src={LOGO} alt="MH Markets" className="h-10" />
+      <img
+        src={LOGO}
+        alt="MH Markets"
+        className="absolute left-1/2 top-1/2 h-10 -translate-x-1/2 -translate-y-1/2"
+      />
       {hideQuit ? (
         <div />
       ) : (
