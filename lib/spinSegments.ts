@@ -18,7 +18,7 @@ export const DEFAULT_SPIN_SEGMENTS: SpinSegment[] = [
   { label: "Premium Merchandise", weight: 90, prize: "Premium Merchandise", dailyQueueCount: 10 },
   { label: "Amazon Vouchers", weight: 15, prize: "Amazon Vouchers", dailyQueueCount: 10 },
   { label: "$100 Funded Account", weight: 9, prize: "USD 100 Funded Account", dailyQueueCount: 5 },
-  { label: "$1,000 Funded Account – Jackpot", weight: 3, prize: "$1,000 Funded Account", dailyQueueCount: 1 },
+  { label: "$1,000 Funded Account", weight: 3, prize: "$1,000 Funded Account", dailyQueueCount: 1 },
   { label: "Spin Again", weight: 80, prize: null, isSpinAgain: true },
   { label: "Not This Time, Thank You.", weight: 40, prize: null },
 ];

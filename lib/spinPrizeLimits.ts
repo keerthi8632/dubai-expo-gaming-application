@@ -8,7 +8,7 @@ export const SPIN_PRIZE_LIMITS_CONFIG_KEY = "spin_prize_limits";
 // a segment's `prize` string exactly (see lib/spinSegments.ts).
 export const DEFAULT_SPIN_PRIZE_LIMITS: Record<string, number> = {
   "Amazon Vouchers": 20,
-  "Premium Merchandise": 30,
+  "Premium Merchandise": 20,
   "USD 100 Funded Account": 10,
   "$1,000 Funded Account": 1,
 };
