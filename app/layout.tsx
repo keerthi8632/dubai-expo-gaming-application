@@ -13,6 +13,9 @@ export const metadata: Metadata = {
   title: "MH Markets | Expo Prediction Challenge",
   description: "Trade Prediction Challenge and Spin & Win, live at the MH Markets expo booth.",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/media/favicon.ico",
+  },
 };
 
 export const viewport: Viewport = {
