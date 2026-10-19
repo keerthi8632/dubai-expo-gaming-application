@@ -11,6 +11,12 @@ type SpinSegment = {
   dailyQueueCount?: number;
 };
 type SpinEventWindow = { startHour: number; startMinute: number; endHour: number; endMinute: number };
+type ServerTime = {
+  serverTimeUtc: string;
+  venueTimezone: string;
+  venueDateKey: string;
+  venueTimeParts: { year: number; month: number; day: number; hour: number; minute: number };
+};
 
 // Must match JACKPOT_LAST_AVAILABLE_DATE / JACKPOT_PRIZE_LABEL in
 // lib/spinPrizeLimits.ts — kept as plain strings here (rather than importing
@@ -57,8 +63,12 @@ export default function ConfigPage() {
   // the admin's list, which shows only what's still actually up for grabs.
   const [claimedIndices, setClaimedIndices] = useState<Set<number>>(new Set());
 
+  const [serverTime, setServerTime] = useState<ServerTime | null>(null);
+  const [serverTimeLoading, setServerTimeLoading] = useState(false);
+
   useEffect(() => {
     load();
+    loadServerTime();
   }, []);
 
   useEffect(() => {
@@ -89,6 +99,20 @@ export default function ConfigPage() {
 
     const segmentsData = await segmentsRes.json();
     if (Array.isArray(segmentsData.segments)) setSegments(segmentsData.segments);
+  }
+
+  // Confirms the deployed server's clock (which all win-timing logic is
+  // computed from — never the kiosk tablet's own clock) is sane before the
+  // event goes live. See app/api/admin/server-time/route.ts.
+  async function loadServerTime() {
+    setServerTimeLoading(true);
+    try {
+      const res = await fetch("/api/admin/server-time");
+      const data = await res.json();
+      if (res.ok) setServerTime(data);
+    } finally {
+      setServerTimeLoading(false);
+    }
   }
 
   async function loadQueue(date: string) {
@@ -250,6 +274,41 @@ export default function ConfigPage() {
   return (
     <div className="max-w-3xl space-y-6">
       <h1 className="text-xl font-bold">Game Config</h1>
+
+      <div className="rounded-xl bg-white p-5 shadow">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">Server Time</h2>
+          <button
+            onClick={loadServerTime}
+            disabled={serverTimeLoading}
+            className="rounded bg-black/10 px-2 py-1 text-xs font-semibold disabled:opacity-50"
+          >
+            {serverTimeLoading ? "Checking…" : "↻ Refresh"}
+          </button>
+        </div>
+        <p className="mt-1 text-xs text-black/50">
+          All game-win timing (jackpot day gate, prize queue windows, min gap between wins) is computed from this
+          server's clock converted into venue-local time — never the kiosk tablet's own clock. Check this before
+          going live.
+        </p>
+        {serverTime ? (
+          <div className="mt-3 flex flex-wrap gap-6 text-sm">
+            <div>
+              <p className="text-xs uppercase text-black/40">Server (UTC)</p>
+              <p className="font-mono font-medium">{serverTime.serverTimeUtc}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase text-black/40">Venue ({serverTime.venueTimezone})</p>
+              <p className="font-mono font-medium">
+                {serverTime.venueDateKey} {String(serverTime.venueTimeParts.hour).padStart(2, "0")}:
+                {String(serverTime.venueTimeParts.minute).padStart(2, "0")}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-black/40">{serverTimeLoading ? "Checking…" : "Unavailable"}</p>
+        )}
+      </div>
 
       <div className="rounded-xl bg-white p-5 shadow">
         <h2 className="font-semibold">Trade Prediction — Default Win Rate</h2>

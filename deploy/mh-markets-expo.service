@@ -1,0 +1,29 @@
+# systemd alternative to pm2 (deploy/ecosystem.config.js) — pick one, not
+# both. Use this if the server doesn't have Node's global package install
+# permissions set up for pm2, or if systemd is already how other services
+# on this box are managed.
+#
+# Install on the server:
+#   sudo cp deploy/mh-markets-expo.service /etc/systemd/system/
+#   # then edit WorkingDirectory below to the real absolute path first
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now mh-markets-expo
+#
+# After that: `systemctl status mh-markets-expo`, `journalctl -u mh-markets-expo -f`.
+
+[Unit]
+Description=MH Markets Expo — Next.js app
+After=network.target
+
+[Service]
+Type=simple
+# REPLACE with the real absolute path on the server, e.g. /home/ubuntu/mh-markets-expo
+WorkingDirectory=/REPLACE/WITH/REAL/PATH/mh-markets-expo
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=3
+Environment=NODE_ENV=production
+User=root
+
+[Install]
+WantedBy=multi-user.target
